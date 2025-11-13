@@ -3,7 +3,7 @@ contract C1 {
     int x;
     bool b;
   
-    function f() { if b then x=2 else b=true; skip }
+    function f() { if (b) x=2; else b=true; skip }
 
     function pay(?x:T,y) {
         require (count<MAX_COUNT);

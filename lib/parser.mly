@@ -89,15 +89,15 @@ expr:
 ;
 
 nonseq_cmd:
-  | SKIP { Skip }
-  | REQ; e = expr { Req(e) } 
-  | x = ID; TAKES; e = expr { Assign(x,e) }
-  | x = ID; SENDSEP; e=expr; TOKSEP; t = ID; { Send(x,e,t) }
-  | f = ID; LPAREN; e=expr; RPAREN { Call(f,e) }
+  | SKIP; CMDSEP;  { Skip }
+  | REQ; e = expr; CMDSEP; { Req(e) } 
+  | x = ID; TAKES; e = expr; CMDSEP; { Assign(x,e) }
+  | x = ID; SENDSEP; e=expr; TOKSEP; t = ID; CMDSEP; { Send(x,e,t) }
+  | f = ID; LPAREN; e=expr; RPAREN; CMDSEP; { Call(f,e) }
 
 cmd:
   | c = nonseq_cmd { c }
-  | c1 = cmd; CMDSEP; c2 = cmd { Seq(c1,c2) }
+  | c1 = cmd; c2 = cmd { Seq(c1,c2) }
   | IF LPAREN; e = expr; RPAREN; c1 = nonseq_cmd ELSE c2 = nonseq_cmd { If(e,c1,c2) }
   | IF LPAREN; e = expr; RPAREN; LBRACE; c1 = cmd; RBRACE; ELSE c2 = nonseq_cmd { If(e,c1,c2) }
   | IF LPAREN; e = expr; RPAREN; c1 = nonseq_cmd; ELSE LBRACE; c2 = cmd; RBRACE; { If(e,c1,c2) }
