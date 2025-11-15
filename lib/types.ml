@@ -23,6 +23,7 @@ type account_state = {
 type sysstate = {
   accounts: addr -> account_state;
   stackenv: env list;
+  active: addr list; (* set of all active addresses (for debugging)*)
 }
 
 (* execution state *)

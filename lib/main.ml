@@ -157,12 +157,19 @@ let rec trace_rec_cmd n t =
       in t::(trace_rec_cmd (n-1) t')
     with NoRuleApplies -> [t]
 
-
-(* let init_storage = { balance=0; storage=botenv; code = None } *)
+  
+let init_storage (Contract(_,vdl,_)) : ide -> exprval =
+  List.fold_left (fun acc var -> 
+      let (x,v) = (match var with 
+        | IntVar x  -> (x, Int 0)
+        | BoolVar x -> (x, Bool false)
+        | AddrVar x -> (x, Addr "0"))
+      in bind acc x v) botenv vdl 
 
 let init_sysstate = { 
     accounts = (fun a -> failwith ("account " ^ a ^ " unbound")); 
-    stackenv = [botenv] 
+    stackenv = [botenv];
+    active = []; 
 }
 
 let trace_cmd n_steps (c:cmd) (a:addr) (st : sysstate)=
@@ -179,7 +186,7 @@ let faucet (a : addr) (n : int) (st : sysstate) : sysstate =
     { st with accounts = bind st.accounts a as' }
   else
     let as' = { balance = n; storage = botenv; code = None; } in
-    { st with accounts = bind st.accounts a as' }
+    { st with accounts = bind st.accounts a as'; active = a::st.active }
 
 let find_fun (Contract(_,_,fdl)) (f : ide) : fun_decl option =
   List.fold_left 
@@ -192,8 +199,8 @@ let find_fun (Contract(_,_,fdl)) (f : ide) : fun_decl option =
 let deploy_contract (st : sysstate) (a : addr) (c : contract) : sysstate =
   if exists_account st a then failwith ("deploy_contract: address " ^ a ^ " already bound in sysstate")
   else
-    let as' = bind st.accounts a ({ balance=0; storage=botenv; code = Some c }) in
-  { st with accounts = as' }
+    let as' = bind st.accounts a ({ balance=0; storage = init_storage c; code = Some c }) in
+  { st with accounts = as'; active = a::st.active }
 
 let exec_tx (n_steps : int) (Tx(a,b,f,_)) (st : sysstate) =
   if not (exists_account st a) then failwith ("sender address " ^ a ^ " does not exist") else

@@ -1,5 +1,5 @@
 open TinysolLib.Types       
-open TinysolLib.Prettyprint
+open TinysolLib.Utils
 open TinysolLib.Main
 
 

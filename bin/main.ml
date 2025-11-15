@@ -1,4 +1,4 @@
-open TinysolLib.Prettyprint
+open TinysolLib.Utils
 open TinysolLib.Main
        
 (* read file, and output it to a string *)
@@ -35,11 +35,12 @@ match Array.length(Sys.argv) with
     | src -> src |> parse_contract
       |> deploy_contract init_sysstate "0xAA" 
       |> faucet "0x0" 100
-      |> exec_tx 10 (Tx("0x0","0xAA","g", []))
+      |> exec_tx 1000 (Tx("0x0","0xAA","g", []))
       |> string_of_trace |> print_string)
 (* wrong usage *)      
 | _ -> print_string "Usage:
   dune exec tinysol parse_cmd   : parses cmd in stdin
   dune exec tinysol exec_cmd <n_steps>   : executes n_steps of cmd in stdin
-  dune exec tinysol parse_contract <filename>   : parses contract in file
+  dune exec tinysol parse_contract <file>   : parses contract in file
+  dune exec tinysol exec_tx <file> <n_steps> : executes n_steps of contract in file
 "
