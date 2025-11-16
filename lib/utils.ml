@@ -57,7 +57,7 @@ and vars_of_cmd = function
   | If(e,c1,c2) -> union (vars_of_expr e) (union (vars_of_cmd c1) (vars_of_cmd c2))
   | Send(e1,e2) -> union (vars_of_expr e1) (vars_of_expr e2)
   | Req(e) -> vars_of_expr e                    
-  | Call(f,e) -> union [f] (vars_of_expr e)
+  | Call(f,el) -> union [f] (List.fold_left (fun acc e -> union acc (vars_of_expr e)) [] el)
   | ExecCall(c) -> vars_of_cmd c
   | Block(_,c) -> vars_of_cmd c
   | ExecBlock(c) -> vars_of_cmd c
@@ -110,7 +110,7 @@ and string_of_cmd = function
   | If(e,c1,c2) -> "if (" ^ string_of_expr e ^ ") {" ^ string_of_cmd c1 ^ "} else {" ^ string_of_cmd c2 ^ "}"
   | Send(e1,e2) -> string_of_expr e1 ^ ".transfer(" ^ (string_of_expr e2) ^ ");"
   | Req(e) -> "require " ^ string_of_expr e ^ ";"
-  | Call(f,e) -> f ^ "(" ^ string_of_expr e ^ ")"
+  | Call(f,el) -> f ^ "(" ^ (List.fold_left (fun acc e -> acc ^ "," ^ string_of_expr e) "" el) ^ ")"
   | ExecCall(c) -> "exec{" ^ string_of_cmd c ^ "}"
   | Block(vdl,c) -> "{" 
     ^ List.fold_left (fun s d -> s ^ (if s<>"" then "; " else "") ^ string_of_var_decl d) "" vdl ^ ";" 

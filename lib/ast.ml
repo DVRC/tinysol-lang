@@ -1,9 +1,6 @@
 (* variable/function/contract identifier *)
 type ide = string
 
-(* token identifier *)
-type tok = string
-
 (* address identifier *)
 type addr = string
 
@@ -46,7 +43,7 @@ and cmd =
   | If of expr * cmd * cmd
   | Send of expr * expr       (* send(e1,e2) transfers e2 wei to e1 *)
   | Req of expr               (* require(e) reverts if e is false *) 
-  | Call of ide * expr        (* TODO: add actual parameters *)
+  | Call of ide * expr list
   | ExecCall of cmd           (* Runtime only: c is the cmd being reduced *)
   | Block of var_decls * cmd
   | ExecBlock of cmd          (* Runtime only: c is the cmd being reduced *)

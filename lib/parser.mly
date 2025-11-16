@@ -68,7 +68,7 @@ open Ast
 %type <modifier> modifier
 %type <fun_decl> fun_decl
 %type <cmd> cmd
-%type <var_decls> args
+%type <var_decls> formal_args
 %type <expr> expr 
 
 %start <cmd> cmd_test
@@ -80,7 +80,7 @@ contract:
 ;
 
 transaction:
-  | sender = ADDRLIT; TOKSEP; contr = ADDRLIT; FIELDSEP; f = ID; LPAREN; a = actual_args; RPAREN { Tx(sender,contr,f,a) } 
+  | sender = ADDRLIT; TOKSEP; contr = ADDRLIT; FIELDSEP; f = ID; LPAREN; al = actual_args; RPAREN { Tx(sender,contr,f,al) } 
 ;
 
 actual_args:
@@ -121,7 +121,7 @@ nonseq_cmd:
   | REQ; e = expr; CMDSEP; { Req(e) } 
   | x = ID; TAKES; e = expr; CMDSEP; { Assign(x,e) }
   | rcv=expr; FIELDSEP; TRANSFER; LPAREN; amt=expr; RPAREN; CMDSEP; { Send(rcv,amt) }
-  | f = ID; LPAREN; e=expr; RPAREN; CMDSEP; { Call(f,e) }
+  | f = ID; LPAREN; el = separated_list(ARGSEP, expr) RPAREN; CMDSEP; { Call(f,el) }
 
 cmd:
   | c = nonseq_cmd { c }
@@ -146,19 +146,19 @@ modifier:
 ;
 
 fun_decl:
-  | CONSTR; LPAREN; a = args; RPAREN; LBRACE; c = cmd; RBRACE { Proc("constructor",a,c,Public) }
-  | FUN; f = ID; LPAREN; a = args; RPAREN; m=modifier; LBRACE; c = cmd; RBRACE { Proc(f,a,c,m) }
-  | FUN; f = ID; LPAREN; a = args; RPAREN; m=modifier; LBRACE; RBRACE { Proc(f,a,Skip,m) }
+  | CONSTR; LPAREN; al = formal_args; RPAREN; LBRACE; c = cmd; RBRACE { Proc("constructor",al,c,Public) }
+  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; m=modifier; LBRACE; c = cmd; RBRACE { Proc(f,al,c,m) }
+  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; m=modifier; LBRACE; RBRACE { Proc(f,al,Skip,m) }
 ;
 
 cmd_test:
   | c = cmd; EOF { c }
 ;
 
-args:
-  | a = separated_list(ARGSEP, arg) { a } ;
+formal_args:
+  | a = separated_list(ARGSEP, formal_arg) { a } ;
 
-arg:
+formal_arg:
   | INT; x = ID { IntVar x }
   | BOOL; x = ID { BoolVar x }
   | ADDR; x = ID { AddrVar x }
