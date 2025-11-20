@@ -314,3 +314,111 @@ let%test "test_typecheck_18" = test_typecheck
     function f(uint x) public { x = -1; }
 }"
 false
+
+let%test "test_typecheck_19" = test_typecheck 
+"contract C {
+    int x; bool b;
+    function f(uint x) public { x = b; }
+}"
+false
+
+let%test "test_typecheck_20" = test_typecheck 
+"contract C {
+    int x; bool b;
+    function f(uint x) public { b = x; }
+}"
+false
+
+let%test "test_typecheck_21" = test_typecheck 
+"contract C {
+    int x; address a;
+    function f(uint x) public { x = a; }
+}"
+false
+
+let%test "test_typecheck_22" = test_typecheck 
+"contract C {
+    int x; address a;
+    function f(uint x) public { a = x; }
+}"
+false
+
+let%test "test_typecheck_23" = test_typecheck 
+"contract C {
+    int x;
+    function f(uint y) public { y = x; }
+}"
+false
+
+let%test "test_typecheck_24" = test_typecheck 
+"contract C {
+    int x;
+    // uint is not convertible to int
+    function f(uint y) public { x = y; }
+}"
+false
+
+let%test "test_typecheck_25" = test_typecheck 
+"contract C {
+    int x;
+    // uint is not comparable to int
+    function f(uint y) public { require (x < y); }
+}"
+false
+
+let%test "test_typecheck_26" = test_typecheck 
+"contract C {
+    uint x;
+    // uint is not comparable to int
+    function f(int y) public { require (x < y); }
+}"
+false
+
+let%test "test_typecheck_27" = test_typecheck 
+"contract C {
+    int x;
+    function f(int y) public { require (x < y && y < -5); }
+}"
+true
+
+let%test "test_typecheck_28" = test_typecheck 
+"contract C {
+    uint x;
+    function f(uint y) public { require (x < y && y < 5); }
+}"
+true
+
+let%test "test_typecheck_29" = test_typecheck 
+"contract C {
+    uint x;
+    function f(uint y) public { require (x < y && y == x+5); }
+}"
+true
+
+let%test "test_typecheck_29" = test_typecheck 
+"contract C {
+    int x;
+    function f(int y) public { require (x < y && y != 5); }
+}"
+true
+
+let%test "test_typecheck_30" = test_typecheck 
+"contract C {
+    int x;
+    function f(uint y) public { require uint(x) < y; x = int(y); }
+}"
+true
+
+let%test "test_typecheck_31" = test_typecheck 
+"contract C {
+    int x;
+    function f(uint y) public { require int(y) < x; y = uint(x); }
+}"
+true
+
+let%test "test_typecheck_32" = test_typecheck 
+"contract C {
+    int x;
+    function f(uint y) public { require int(y)+x < 7; y = uint(x) + 1; }
+}"
+true

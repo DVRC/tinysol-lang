@@ -31,7 +31,7 @@ let subtype t0 t1 = match t1 with
   | UintConstT -> t0 = t1
   | UintT -> t0 = UintConstT || t0 = t1
   | IntConstT -> t0 = UintConstT || t0 = t1
-  | IntT -> t0 = UintConstT || t0 == IntConstT || t0 == UintT || t0 = t1
+  | IntT -> t0 = UintConstT || t0 == IntConstT || t0 = t1 (* uint is not convertible to int *)
   | _ -> t0 = t1
 
 let rec typecheck_expr (vdl : var_decl list) = function
@@ -76,13 +76,16 @@ let rec typecheck_expr (vdl : var_decl list) = function
   | Neq(e1,e2) ->
     (match (typecheck_expr vdl e1,typecheck_expr vdl e2) with
        (t1,t2) when t1=t2-> BoolT
+     | (t1,t2) when subtype t1 UintT && subtype t2 UintT -> BoolT
+     | (t1,t2) when subtype t1 IntT && subtype t2 IntT -> BoolT
      | (t1,t2) -> raise (TypeError (e2,t2,t1)))
   | Leq(e1,e2)
   | Le(e1,e2)
   | Geq(e1,e2)
   | Ge(e1,e2) ->
     (match (typecheck_expr vdl e1,typecheck_expr vdl e2) with
-       (t1,t2) when subtype t1 IntT && subtype t2 IntT -> BoolT
+     | (t1,t2) when subtype t1 UintT && subtype t2 UintT -> BoolT
+     | (t1,t2) when subtype t1 IntT && subtype t2 IntT -> BoolT
      | (t1,IntT) -> raise (TypeError (e1,t1,IntT))
      | (_,t2) -> raise (TypeError (e2,t2,IntT)))
   | IntCast(e) -> (match typecheck_expr vdl e with
