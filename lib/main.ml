@@ -17,19 +17,23 @@ let is_val = function
   | _ -> false
 
 let int_of_exprval v = match v with 
-  | Int n -> n
+  | Int n  -> n
   | Bool _ -> failwith "value has type Bool but an Int was expected"
   | Addr _ -> failwith "value has type Addr but an Int was expected"
+  | Map _  -> failwith "value has type Map but an Int was expected"
 
 let bool_of_exprval v = match v with 
   | Bool b -> b
-  | Int _ -> failwith "value has type Int but an Bool was expected"
+  | Int _  -> failwith "value has type Int but an Bool was expected"
   | Addr _ -> failwith "value has type Addr but an Bool was expected"
+  | Map _  -> failwith "value has type Map but an Bool was expected"
+
 
 let addr_of_exprval v = match v with 
   | Addr a -> a
   | Bool _ -> failwith "value has type Bool but an Addr was expected"
   | Int _ -> failwith "value has type Int but an Addr was expected"
+  | Map _ -> failwith "value has type Map but an Addr was expected"
 
 let rec eval_expr (st : sysstate) (a : addr) = function
     True -> Bool true
@@ -38,6 +42,10 @@ let rec eval_expr (st : sysstate) (a : addr) = function
   | AddrConst s -> Addr s
   | This -> Addr a
   | Var x -> lookup_var a x st
+  | MapR(e1,e2) -> (match eval_expr st a e1 with 
+    | Map m -> m (eval_expr st a e2)
+    | _ -> failwith "Trying to apply a non-map variable"
+    )
   | BalanceOf e ->
     let b = addr_of_exprval (eval_expr st a e) in
     Int (lookup_balance b st)
@@ -111,10 +119,11 @@ let eval_var_decls (vdl : var_decl list) (e : env): env =
   List.fold_left
     (fun acc vd ->
       match vd with
-        | IntVar x  
-        | UintVar x -> acc |> bind x (Int 0)
-        | BoolVar x -> acc |> bind x (Bool false)
-        | AddrVar x -> acc |> bind x (Addr "0")
+        | VarT(IntBT),x  
+        | VarT(UintBT),x -> acc |> bind x (Int 0)
+        | VarT(BoolBT),x -> acc |> bind x (Bool false)
+        | VarT(AddrBT),x -> acc |> bind x (Addr "0")
+        | MapT(_),_ -> failwith "mappings cannot be used in local declarations" 
     )
     e
     vdl
@@ -135,6 +144,9 @@ let rec trace1_cmd = function
         (* if not, tries to update storage of a *)
         with _ -> 
           St (update_storage st a x (eval_expr st a e)))
+    | MapW(x,ek,ev) ->
+        let k = eval_expr st a ek in 
+        St (update_map st a x k (eval_expr st a ev))
     | Seq(c1,c2) -> (match trace1_cmd (Cmd(c1,st,a)) with
         | St st1 -> Cmd(c2,st1,a)
         | Reverted -> Reverted
@@ -191,14 +203,18 @@ let sem_decl (e,l) = function
   | Proc(f,a,c) -> let e' = bind e f (IProc(a,c)) in (e',l)
 *)
 
- 
+let default_value = function 
+  IntBT  
+| UintBT -> Int 0
+| BoolBT -> Bool false
+| AddrBT -> Addr "0"
+
 let init_storage (Contract(_,vdl,_)) : ide -> exprval =
-  List.fold_left (fun acc var -> 
-      let (x,v) = (match var with 
-        | IntVar x  
-        | UintVar x -> (x, Int 0)
-        | BoolVar x -> (x, Bool false)
-        | AddrVar x -> (x, Addr "0"))
+  List.fold_left (fun acc vd -> 
+      let (x,v) = (match vd with 
+        | VarT(t),x -> (x, default_value t)
+        | MapT(_,tv),x -> (x, Map (fun _ -> (default_value tv)))
+      )
       in bind x v acc) botenv vdl 
 
 let init_sysstate = { 
@@ -258,10 +274,11 @@ let bind_fargs_aargs (xl : var_decl list) (vl : exprval list) : env =
   else 
   List.fold_left2 
   (fun acc x_decl v -> match (x_decl,v) with 
-   | (IntVar x, Int _)
-   | (BoolVar x, Bool _) 
-   | (AddrVar x, Addr _) -> bind x v acc
-   | (UintVar x, Int n) when n>=0 -> bind x v acc
+   | ((VarT(IntBT),x), Int _)
+   | ((VarT(BoolBT),x), Bool _) 
+   | ((VarT(AddrBT),x), Addr _) -> bind x v acc
+   | ((VarT(UintBT),x), Int n) when n>=0 -> bind x v acc
+   | ((MapT(_),_),_) -> failwith "Maps cannot be passed as function parameters"
    | _ -> failwith "exec_tx: type mismatch between formal and actual arguments") 
   botenv 
   xl 
@@ -290,7 +307,7 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : sysstate =
           (try let c = parse_contract code in 
             { balance=tx.txvalue; storage = init_storage c; code = Some c }, 
             true (* deploy=true ==> must call constructor *)
-          with _ -> failwith "exec_tx: syntax error in contract code")
+          with _ -> failwith ("exec_tx: syntax error in contract code: " ^ code))
       | _ -> failwith "exec_tx: the first parameter of a deploy transaction must be the contract code") in
   match to_state.code with
   | None -> failwith "Called address is not a contract"
@@ -313,11 +330,11 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : sysstate =
         let xl',vl' =
           if deploy then match tx.txargs with 
             _::al -> 
-            AddrVar "msg.sender" :: xl,
+            (VarT(AddrBT),"msg.sender") :: xl,
             Addr (tx.txsender) :: al
             | _ -> assert(false) (* should not happen *)
           else
-            AddrVar "msg.sender" :: IntVar "msg.value" :: xl,
+            (VarT(AddrBT),"msg.sender") :: (VarT(IntBT),"msg.value") :: xl,
             Addr tx.txsender :: Int tx.txvalue :: tx.txargs
         in
         let e' = bind_fargs_aargs xl' vl' in

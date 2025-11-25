@@ -80,6 +80,17 @@ let update_storage (st : sysstate) (a:addr) (x:ide) (v:exprval) : sysstate =
       { st with accounts = bind a cs' st.accounts }
     else failwith (x ^ " not bound in storage of " ^ a)   
 
+let update_map (st : sysstate) (a:addr) (x:ide) (k:exprval) (v:exprval) : sysstate = 
+  let cs = st.accounts a in
+    if mem_contract_state cs x then 
+      match cs.storage x with
+      | Map m ->
+        let m' = bind k v m in
+        let cs' = { cs with storage = bind x (Map m') cs.storage } in 
+        { st with accounts = bind a cs' st.accounts }
+      | _ -> failwith ("update_map: " ^ x ^ " is not a map")
+      else failwith (x ^ " not bound in storage of " ^ a)   
+
 let update_env (st : sysstate) (x:ide) (v:exprval) : sysstate =
   let el = st.stackenv in match el with
   | [] -> failwith "Empty stack"

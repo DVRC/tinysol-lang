@@ -24,15 +24,15 @@ let%test "test_parse_cmd_2" = test_parse_cmd
 
 let%test "test_parse_cmd_3" = test_parse_cmd
   "{ int x; x=51; }" 
-  (Block([IntVar "x"],Assign("x",IntConst 51)))  
+  (Block([VarT(IntBT),"x"],Assign("x",IntConst 51)))  
 
 let%test "test_parse_cmd_4" = test_parse_cmd
   "{ int x; x=51; x=x+1; }"
-  (Block([IntVar "x"],Seq(Assign("x",IntConst 51),Assign("x",Add(Var "x",IntConst 1)))))  
+  (Block([VarT(IntBT),"x"],Seq(Assign("x",IntConst 51),Assign("x",Add(Var "x",IntConst 1)))))  
 
 let%test "test_parse_cmd_5" = test_parse_cmd
   "{ int x; x=51; x=x+1; skip; }" 
-  (Block([IntVar "x"],
+  (Block([VarT(IntBT),"x"],
     Seq(
       Assign("x",IntConst 51),
       Seq(
@@ -41,6 +41,30 @@ let%test "test_parse_cmd_5" = test_parse_cmd
       )
     )))
 
+let%test "test_parse_cmd_6" = test_parse_cmd
+  "{ uint x; mapping (uint => int) m; x = m[x+1]; }"
+  (Block ([(VarT UintBT, "x"); (MapT (UintBT, IntBT), "m")],
+  Assign ("x", MapR (Var "m", Add (Var "x", IntConst 1)))))
+
+let%test "test_parse_cmd_7" = test_parse_cmd
+  "{ mapping (uint => uint) m; m[0] = m[0]+1; }"
+  (Block ([(MapT (UintBT, UintBT), "m")],
+ MapW ("m", IntConst 0, Add (MapR (Var "m", IntConst 0), IntConst 1))))
+
+let%test "test_parse_cmd_8" = test_parse_cmd
+  "{ mapping (uint => uint) m; m[m[0]] = m[m[1]+2]+3; }"
+  (Block ([(MapT (UintBT, UintBT), "m")],
+ MapW ("m", MapR (Var "m", IntConst 0),
+  Add (MapR (Var "m", Add (MapR (Var "m", IntConst 1), IntConst 2)),
+   IntConst 3))))
+
+let%test "test_parse_cmd_9" = try 
+  let _ = parse_cmd
+    "contract C {
+        function f(mapping (uint => uint) m) public { m[0] = 1; }
+    }"
+  in false 
+  with _ -> true
 
 (********************************************************************************
  test_trace_cmd : (command, n_steps, variable, expected value after n_steps)
@@ -217,6 +241,19 @@ let%test "test_exec_tx_9" = test_exec_tx
   }"
   ["0xA:0xC.f(3)"; "0xA:0xC.f(0)"] 
   ["x==2"]
+
+
+let%test "test_map_1" = test_exec_tx
+  "contract C {
+      mapping (uint => uint) m;
+      uint x;
+      function f(int k, int v) public { m[k] = v; }
+      function g(int k) public { x = m[k]; }
+  }"
+  ["0xA:0xC.f(0,1)"; "0xA:0xC.g(0)"] 
+  ["x==1"]
+
+
 
 let test_typecheck (src: string) (exp : bool)=
   let c = parse_contract src in 
@@ -511,3 +548,36 @@ let%test "test_typecheck_41" = test_typecheck
       function f(int y) public { x=7; x = uint(y)-1; }
   }"
   true
+
+let%test "test_typecheck_42" = test_typecheck 
+  "contract C {
+      mapping (uint => uint) m;
+      uint x;
+      function w(uint k, uint v) public { m[k] = v; }
+      function r(uint k) public { x = m[k]; }
+  }"
+  true
+
+let%test "test_typecheck_43" = test_typecheck 
+  "contract C {
+      mapping (uint => uint) m;
+      uint x;
+      function w(uint k, uint v) public { x[k] = v; }
+      function r(uint k) public { x = m[k]; }
+  }"
+  false
+
+let%test "test_typecheck_44" = test_typecheck 
+  "contract C {
+      mapping (uint => uint) m;
+      uint x;
+      function w(uint k, uint v) public { m[k] = v; }
+      function r(uint k) public { x[k] = m[k]; }
+  }"
+  false
+
+let%test "test_typecheck_45" = test_typecheck 
+  "contract C {
+      function f() public { mapping (uint => uint) m; m[0] = 1; }
+  }"
+  false

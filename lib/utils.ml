@@ -79,6 +79,7 @@ let rec vars_of_expr = function
   | IntCast e
   | UintCast e
   | AddrCast e ->  vars_of_expr e
+  | MapR(e1,e2) 
   | And(e1,e2) 
   | Or(e1,e2) 
   | Add(e1,e2)
@@ -94,6 +95,7 @@ let rec vars_of_expr = function
 and vars_of_cmd = function
     Skip -> []
   | Assign(x,e) -> union [x] (vars_of_expr e)
+  | MapW(x,ek,ev) -> union [x] (union (vars_of_expr ek) (vars_of_expr ev))
   | Seq(c1,c2) -> union (vars_of_cmd c1) (vars_of_cmd c2)
   | If(e,c1,c2) -> union (vars_of_expr e) (union (vars_of_cmd c1) (vars_of_cmd c2))
   | Send(e1,e2) -> union (vars_of_expr e1) (vars_of_expr e2)
@@ -104,8 +106,7 @@ and vars_of_cmd = function
   | ExecBlock(c) -> vars_of_cmd c
 
 let vars_of_contract (Contract(_,vdl,_)) : ide list = 
-  List.fold_left (fun acc vd -> match vd with 
-    IntVar x | UintVar x | BoolVar x | AddrVar x -> x::acc ) [] vdl 
+  List.fold_left (fun acc vd -> match vd with _,x -> x::acc ) [] vdl 
 
 
 (******************************************************************************)
@@ -116,6 +117,7 @@ let string_of_exprval = function
     Bool b -> string_of_bool b
   | Int n  -> string_of_int n
   | Addr s -> s
+  | Map _  -> "<map>" (* do not expand map *) 
 
 let string_of_modifier = function
   | Public -> "public"
@@ -130,6 +132,7 @@ let rec string_of_expr = function
   | AddrConst a -> "\"" ^ a ^ "\""
   | This -> "this"
   | Var x -> x
+  | MapR(e1,e2) -> string_of_expr e1 ^ "[" ^ string_of_expr e2 ^ "]"
   | BalanceOf e -> string_of_expr e ^ ".balance"
   | Not e -> "!" ^ string_of_expr e
   | And(e1,e2) -> string_of_expr e1 ^ " && " ^ string_of_expr e2
@@ -149,7 +152,8 @@ let rec string_of_expr = function
 
 and string_of_cmd = function
     Skip -> "skip;"
-  | Assign(x,e) -> x ^ "=" ^ string_of_expr e ^ ";"
+  | Assign(x,e) -> x ^ " = " ^ string_of_expr e ^ ";"
+  | MapW(x,ek,ev) -> x ^ "[" ^ string_of_expr ek ^ "] = " ^ string_of_expr ev ^ ";"
   | Seq(c1,c2) -> string_of_cmd c1 ^ " " ^ string_of_cmd c2
   | If(e,c1,c2) -> "if (" ^ string_of_expr e ^ ") {" ^ string_of_cmd c1 ^ "} else {" ^ string_of_cmd c2 ^ "}"
   | Send(e1,e2) -> string_of_expr e1 ^ ".transfer(" ^ (string_of_expr e2) ^ ");"
@@ -164,22 +168,31 @@ and string_of_cmd = function
     ^ string_of_cmd c 
     ^ "}"
 
-and string_of_var_decl = function
-  | IntVar(x) -> "int " ^ x
-  | UintVar(x) -> "uint " ^ x
-  | BoolVar(x) -> "bool " ^ x
-  | AddrVar(x) -> "address " ^ x
+and string_of_base_type = function
+| IntBT  -> "int"
+| UintBT -> "uint"
+| BoolBT -> "bool"
+| AddrBT -> "address"
+
+and string_of_var_type = function
+| VarT t -> string_of_base_type t
+| MapT(tk,tv) -> "mapping (" ^ string_of_base_type tk ^ " => " ^ string_of_base_type tv ^ ")"
+
+and string_of_var_decl ((t,x) : var_decl) : string = 
+  string_of_var_type t ^ " " ^ x
 
 let string_of_var_decls = List.fold_left (fun s d -> s ^ (if s<>"" then ";\n  " else "  ") ^ string_of_var_decl d) ""
 
+let string_of_fun_args = List.fold_left (fun s d -> s ^ (if s<>"" then ", " else "") ^ string_of_var_decl d) ""
+
 let string_of_fun_decl = function 
   | Proc(f,al,c,v,p) -> 
-    "function " ^ f ^ "(" ^ (string_of_var_decls al) ^ ") " ^
+    "function " ^ f ^ "(" ^ (string_of_fun_args al) ^ ") " ^
     string_of_modifier v ^ " " ^
     (if p then "payable " else "") ^ 
     "{" ^ string_of_cmd c ^ "}\n"
   | Constr(al,c,p) ->       
-    "constructor " ^ "(" ^ (string_of_var_decls al) ^ ") " ^
+    "constructor " ^ "(" ^ (string_of_fun_args al) ^ ") " ^
     (if p then "payable " else "") ^ 
     "{" ^ string_of_cmd c ^ "}\n"
 
@@ -195,12 +208,7 @@ let string_of_contract (Contract(c,vdl,fdl)) =
 let string_of_env e vl = 
   let rec helper e vl = match vl with 
   | [] -> ""
-  | x::vl' -> try (x ^ "->" ^
-    match e x with 
-      | Bool b -> string_of_bool b
-      | Int  n -> string_of_int n
-      | Addr a -> a
-    )
+  | x::vl' -> try (x ^ "->" ^ string_of_exprval (e x))
     with _ -> helper e vl' 
   in "{" ^ helper e vl ^ "}"
 
@@ -228,8 +236,6 @@ let string_of_accounts (st : sysstate) =
   "[" ^ 
   (List.fold_left (fun acc a -> acc ^ a ^ " -> " ^ (string_of_account_state (st.accounts a)) ^ " ") "" st.active) ^ 
   "]"
-
-(* TODO: add storage variables *)
 
 let string_of_sysstate (evl : ide list) (st : sysstate) =
   "accounts: " ^ 

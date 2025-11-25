@@ -32,6 +32,10 @@ open Ast
 %token RPAREN
 %token LBRACE
 %token RBRACE
+%token LSQUARE
+%token RSQUARE
+%token MAPSTO
+%token MAPPING
 %token EOF
 
 %token CONTRACT
@@ -124,6 +128,7 @@ expr:
   | e1=expr; LE; e2=expr { Le(e1,e2) }
   | e1=expr; GEQ; e2=expr { Geq(e1,e2) }
   | e1=expr; GE; e2=expr { Ge(e1,e2) }
+  | e1=expr; LSQUARE; e2=expr; RSQUARE { MapR(e1,e2) }
   | INT; LPAREN; e=expr; RPAREN; { IntCast(e) }
   | UINT; LPAREN; e=expr; RPAREN; { UintCast(e) }
   | ADDR; LPAREN; e=expr; RPAREN; { AddrCast(e) }
@@ -139,6 +144,7 @@ nonseq_cmd:
   | SKIP; CMDSEP;  { Skip }
   | REQ; e = expr; CMDSEP; { Req(e) } 
   | x = ID; TAKES; e = expr; CMDSEP; { Assign(x,e) }
+  | x = ID; LSQUARE; ek = expr; RSQUARE; TAKES; ev = expr; CMDSEP; { MapW(x,ek,ev) }
   | rcv=expr; FIELDSEP; TRANSFER; LPAREN; amt=expr; RPAREN; CMDSEP; { Send(rcv,amt) }
   | f = ID; LPAREN; el = separated_list(ARGSEP, expr) RPAREN; CMDSEP; { Call(f,el) }
 ;
@@ -159,11 +165,18 @@ cmd_eof:
   | c = cmd; EOF { c }
 ;
 
+base_type:
+  | INT  { IntBT  }
+  | UINT { UintBT }
+  | BOOL { BoolBT }
+  | ADDR { AddrBT }
+
+var_type:
+  | t = base_type { VarT(t) }
+  | MAPPING; LPAREN; t1 = base_type; MAPSTO; t2 = base_type; RPAREN { MapT(t1,t2) }
+
 var_decl:
-  | INT x = ID; CMDSEP { IntVar x }
-  | UINT x = ID; CMDSEP { UintVar x }
-  | BOOL x = ID; CMDSEP { BoolVar x }
-  | ADDR x = ID; CMDSEP { AddrVar x }
+  | t = var_type; x = ID; CMDSEP { t,x }
 ;
 
 visibility:
@@ -187,10 +200,10 @@ formal_args:
   | a = separated_list(ARGSEP, formal_arg) { a } ;
 
 formal_arg:
-  | INT; x = ID { IntVar x }
-  | UINT; x = ID { UintVar x }
-  | BOOL; x = ID { BoolVar x }
-  | ADDR; x = ID { AddrVar x }
+  | INT;  x = ID { VarT(IntBT),x }
+  | UINT; x = ID { VarT(UintBT),x }
+  | BOOL; x = ID { VarT(BoolBT),x }
+  | ADDR; x = ID { VarT(AddrBT),x }
 ;
 
 transaction:

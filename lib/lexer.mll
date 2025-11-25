@@ -23,6 +23,8 @@ rule read_token =
   | ")" { RPAREN }
   | "{" { LBRACE }
   | "}" { RBRACE }
+  | "[" { LSQUARE }
+  | "]" { RSQUARE }
   | "true" { TRUE }
   | "false" { FALSE }
   | "!" { NOT }
@@ -37,6 +39,7 @@ rule read_token =
   | "<" { LE }
   | ">=" { GEQ }  
   | ">" { GE }
+  | "=>" { MAPSTO }
   | "." { FIELDSEP }
   | "this" { THIS }
   | "msg.sender" { MSGSENDER }
@@ -59,6 +62,7 @@ rule read_token =
   | "uint" { UINT }
   | "bool" { BOOL }
   | "address" { ADDR }
+  | "mapping" { MAPPING }
   | "public" { PUBLIC }
   | "private" { PRIVATE }
   | "payable" { PAYABLE }

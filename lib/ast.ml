@@ -13,6 +13,7 @@ type expr =
   | AddrConst of addr
   | This
   | Var of ide
+  | MapR of expr * expr
   | BalanceOf of expr
   | Not of expr
   | And of expr * expr
@@ -35,6 +36,7 @@ type expr =
 and cmd =
   | Skip
   | Assign of ide * expr
+  | MapW of ide * expr * expr
   | Seq of cmd * cmd
   | If of expr * cmd * cmd
   | Send of expr * expr       (* send(e1,e2) transfers e2 wei to e1 *)
@@ -44,11 +46,11 @@ and cmd =
   | Block of var_decls * cmd
   | ExecBlock of cmd          (* Runtime only: c is the cmd being reduced *)
 
-and var_decl =
-  | IntVar of ide 
-  | UintVar of ide
-  | BoolVar of ide 
-  | AddrVar of ide 
+and base_type = IntBT | UintBT | BoolBT | AddrBT
+
+and var_type = VarT of base_type | MapT of base_type * base_type
+
+and var_decl = var_type * ide 
 
 and visibility = 
   | Public 
@@ -72,6 +74,7 @@ type exprval =
   | Bool of bool 
   | Int of int
   | Addr of string
+  | Map of (exprval -> exprval)
 
 (* in a deploy transaction, the txfun is "constructor" and the first argument is the contract code *)
 
