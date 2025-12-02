@@ -554,6 +554,58 @@ let%test "test_fun_6" = test_exec_fun
   ["0xA:0xD.g()"] 
   [("0xC","y==2"); ("0xD","x==4")]
 
+let%test "test_fun_7" = test_exec_fun
+  "contract C { uint y; constructor() payable { } 
+      function f(int x1, int x2, int x3) public returns(int) { y = x1+x2+x3; return(2*y); } 
+  }"
+  "contract D { C c; uint x; constructor() payable { c = \"0xC\"; } 
+      function g() public { x = c.f(1+1,1+1+1,1+1+1+1); }
+  }"
+  ["0xA:0xD.g()"] 
+  [("0xC","y==9"); ("0xD","x==18")]
+
+let%test "test_fun_8" = test_exec_fun
+  "contract C { uint y; constructor() payable { y=1; } 
+      function f(int y) public returns(int) { return(2*y); } 
+  }"
+  "contract D { C c; uint x; constructor() payable { c = \"0xC\"; } 
+      function g() public { x = c.f(2); }
+  }"
+  ["0xA:0xD.g()"] 
+  [("0xC","y==1"); ("0xD","x==4")]
+
+let%test "test_fun_9" = test_exec_fun
+  "contract C { uint y; constructor() payable { y=1; } 
+      function f(int z) public returns(int) { if (z>0) return(z+y); else return(-z+y); } 
+  }"
+  "contract D { C c; uint x; constructor() payable { c = \"0xC\"; } 
+      function g() public { x = c.f(-2); }
+  }"
+  ["0xA:0xD.g()"] 
+  [("0xC","y==1"); ("0xD","x==3")]
+
+
+let%test "test_fun_10" = test_exec_fun
+  "contract C { constructor() payable { } 
+      function f() public returns(int) { { return(2); } } 
+  }"
+  "contract D { C c; uint x; constructor() payable { c = \"0xC\"; } 
+      function g() public { x = c.f(); }
+  }"
+  ["0xA:0xD.g()"] 
+  [("0xD","x==2")]
+
+let%test "test_fun_11" = test_exec_fun
+  "contract C { uint y; constructor() payable { y=5; } 
+      function f() public returns(int) { if (msg.sender==\"0xD\") { int z; z=y; y=2; return(z); } else return(-1); } 
+  }"
+  "contract D { C c; uint x; constructor() payable { c = \"0xC\"; } 
+      function g() public { x = c.f(); }
+  }"
+  ["0xA:0xD.g()"] 
+  [("0xC","y==2"); ("0xD","x==5")]
+
+
 let test_typecheck (src: string) (exp : bool)=
   let c = src |> parse_contract |> blockify_contract in 
   try typecheck_contract c = exp

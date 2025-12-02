@@ -3,21 +3,6 @@ open Types
 open Utils
 
 
-let eval_var_decls (vdl : var_decl list) (e : env): env =
-  List.fold_left
-    (fun acc vd ->
-      match vd with
-        | VarT(IntBT,_),x  
-        | VarT(UintBT,_),x -> acc |> bind x (Int 0)
-        | VarT(BoolBT,_),x -> acc |> bind x (Bool false)
-        | VarT(AddrBT _,_),x -> acc |> bind x (Addr "0")
-        | VarT(CustomBT _,_),x -> acc |> bind x (Int 0)
-        | MapT(_),_ -> failwith "mappings cannot be used in local declarations" 
-    )
-    e
-    vdl
-
-
 let rec gather_decls = function
   | Decl d -> [d]
   | Seq(c1,c2) -> gather_decls c1 @ gather_decls c2
@@ -349,7 +334,7 @@ and step_cmd = function
         | CmdSt(c1',st1) -> CmdSt(Seq(c1',c2),st1))
 
     | If(e,c1,c2) when is_val e -> (match exprval_of_expr e with
-          Bool true -> CmdSt(c1,st)
+        | Bool true  -> CmdSt(c1,st)
         | Bool false -> CmdSt(c2,st)
         | _ -> failwith("if: type error"))
     | If(e,c1,c2) -> 
@@ -388,7 +373,15 @@ and step_cmd = function
       let (e', st') = step_expr (e, st) in CmdSt(Return(e'), st')
     
     | Block(vdl,c) ->
-        let e' = eval_var_decls vdl botenv in
+        let e' = List.fold_left (fun acc vd ->
+          match vd with
+            | VarT(IntBT,_),x  
+            | VarT(UintBT,_),x -> acc |> bind x (Int 0)
+            | VarT(BoolBT,_),x -> acc |> bind x (Bool false)
+            | VarT(AddrBT _,_),x -> acc |> bind x (Addr "0")
+            | VarT(CustomBT _,_),x -> acc |> bind x (Int 0)
+            | MapT(_),_ -> failwith "mappings cannot be used in local declarations" 
+        ) botenv vdl in
         CmdSt(ExecBlock c, { st with stackenv = e'::st.stackenv})
 
     | ExecBlock(c) -> (match step_cmd (CmdSt(c,st)) with
