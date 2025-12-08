@@ -1,5 +1,6 @@
 %{
 open Ast
+open Cli_ast
 %}
 
 %token TRUE

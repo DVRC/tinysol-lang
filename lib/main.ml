@@ -1,84 +1,6 @@
 open Ast
-open Types
+open Sysstate
 open Utils
-
-
-let rec gather_decls = function
-  | Decl d -> [d]
-  | Seq(c1,c2) -> gather_decls c1 @ gather_decls c2
-  | _ -> []
-
-let rec purge_decls = function
-  | Decl _ -> Skip
-  | Seq(Decl _,c2) -> purge_decls c2
-  | Seq(c1,Decl _) -> purge_decls c1
-  | Seq(c1,c2) -> Seq(purge_decls c1, purge_decls c2)
-  | Block(vdl,c) -> Block(vdl @ gather_decls c, purge_decls c)
-  | _ as c -> c 
-
-let rec blockify_cmd c = 
-  let vdl = gather_decls c in
-  let c' = purge_decls c in
-  if vdl=[] then blockify_subterms c'
-  else Block(vdl, blockify_subterms c')
-
-and blockify_subterms = function
-  | Block(vdl,c) -> Block(vdl, blockify_subterms c) 
-  | Seq(c1,c2) -> Seq(blockify_subterms c1, blockify_subterms c2) 
-  | If(e,c1,c2) -> If(e, blockify_cmd c1, blockify_cmd c2)
-  | _ as c -> c
-
-let blockify_fun = function
-  | Constr (al,c,p) -> Constr (al,blockify_cmd c,p)
-  | Proc (f,al,c,v,p,r) -> Proc(f,al,blockify_cmd c,v,p,r)
-
-let blockify_contract (Contract(c,el,vdl,fdl)) =
-  Contract(c,el,vdl,List.map blockify_fun fdl)
-
-
-(******************************************************************************)
-(*              Retrieving contracts and functions from state                 *)
-(******************************************************************************)
-
-let find_fun_in_contract (Contract(_,_,_,fdl)) (f : ide) : fun_decl option =
-  List.fold_left 
-  (fun acc fd -> match fd with
-    | Constr(_) -> if acc=None && f="constructor" then Some fd else acc  
-    | Proc(g,_,_,_,_,_) -> if acc=None && f=g then Some fd else acc
-  )
-  None
-  fdl
-
-let find_fun_in_sysstate (st : sysstate) (a : addr) (f : ide) = 
-  if not (exists_account st a) then
-    failwith ("address " ^ a ^ " does not exist")
-  else match (st.accounts a).code with
-    | None -> None  (* "address " ^ a ^ " is not a contract address" *)
-    | Some(c) -> find_fun_in_contract c f 
-
-let get_cmd_from_fun = function
-  | (Constr(_,c,_)) -> c
-  | (Proc(_,_,c,_,_,_)) -> c
-
-let get_var_decls_from_fun = function
-  | (Constr(vdl,_,_)) -> vdl
-  | (Proc(_,vdl,_,_,_,_)) -> vdl
-
-let bind_fargs_aargs (xl : var_decl list) (vl : exprval list) : env =
-  if List.length xl <> List.length vl then
-    failwith "exec_tx: length mismatch between formal and actual arguments"
-  else 
-  List.fold_left2 
-  (fun acc x_decl v -> match (x_decl,v) with 
-   | ((VarT(IntBT,_),x), Int _)
-   | ((VarT(BoolBT,_),x), Bool _) 
-   | ((VarT(AddrBT _,_),x), Addr _) -> bind x v acc
-   | ((VarT(UintBT,_),x), Int n) when n>=0 -> bind x v acc
-   | ((MapT(_),_),_) -> failwith "Maps cannot be passed as function parameters"
-   | _ -> failwith "exec_tx: type mismatch between formal and actual arguments") 
-  botenv 
-  xl 
-  vl 
 
 (******************************************************************************)
 (*                      Small-step semantics of expressions                   *)
@@ -297,12 +219,14 @@ let rec step_expr (e,st) = match e with
 
   | _ -> assert(false)
 
+(* Perform a single evaluation step on a list of actual arguments *)
 and step_expr_list (el, st) = match el with
   | [] -> (el, st)
   | e::tl when is_val e -> 
     let (el',st') = step_expr_list (tl, st) in (e::el', st')
   | e::tl -> 
     let (e',st') = step_expr (e, st) in (e'::tl, st')
+
 
 (******************************************************************************)
 (*                       Small-step semantics of commands                     *)
@@ -446,7 +370,8 @@ and step_cmd = function
       | CmdSt(c1',st1) -> CmdSt(ExecProcCall(c1'),st1))
   )
 
-(* recursively evaluate expression until it reaches a value (might not terminate) *)
+(* Recursively evaluate expression until it reaches a value (might not terminate) *)
+
 let rec eval_expr (st : sysstate) (e : expr) : exprval = 
   if is_val e then exprval_of_expr e
   else let (e', st') = step_expr (e, st) in eval_expr st' e'  

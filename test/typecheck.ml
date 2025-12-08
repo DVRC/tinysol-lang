@@ -1,5 +1,4 @@
 open TinysolLib.Utils
-open TinysolLib.Main
 open TinysolLib.Static
 
 let test_typecheck (src: string) (exp : bool)=

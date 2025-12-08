@@ -1,4 +1,46 @@
 open Ast
+open Cli_ast
+
+(******************************************************************************)
+(*                Conversion between values and expressions                   *)
+(******************************************************************************)
+
+let is_val = function
+  | BoolConst _ 
+  | IntConst _
+  | AddrConst _ -> true
+  | _ -> false
+
+let exprval_of_expr = function
+  | BoolConst b -> (Bool b)
+  | IntConst n  -> (Int n)
+  | AddrConst s -> (Addr s)
+  | _ -> failwith ("expression is not a value")
+
+let int_of_expr e = match e with 
+  | IntConst n  -> n
+  | _ -> failwith "IntConst was expected"
+
+let bool_of_expr e = match e with 
+  | BoolConst b -> b
+  | _  -> failwith "True or False was expected"
+
+let addr_of_expr e = match e with 
+  | AddrConst a -> a
+  | _ -> failwith "AddrConst was expected"
+
+let expr_of_exprval = function
+  | Bool b -> BoolConst b
+  | Int n -> IntConst n
+  | Addr b -> AddrConst b
+  | Map _ -> failwith "step_expr: wrong type checking of map?"
+
+let addr_of_exprval v = match v with 
+  | Addr a -> a
+  | Bool _ -> failwith "value has type Bool but an Addr was expected"
+  | Int _ -> failwith "value has type Int but an Addr was expected"
+  | Map _ -> failwith "value has type Map but an Addr was expected"
+
 
 (******************************************************************************)
 (*                                   List utilities                           *)
@@ -76,3 +118,39 @@ let parse_cli_cmd (s : string) : cli_cmd =
   let lexbuf = Lexing.from_string s in
   let ast = Parser.cli_cmd Lexer.read_token lexbuf in
   ast
+
+(******************************************************************************)
+(*                 Transform inline declarations into blocks                  *)
+(******************************************************************************)
+
+let rec gather_decls = function
+  | Decl d -> [d]
+  | Seq(c1,c2) -> gather_decls c1 @ gather_decls c2
+  | _ -> []
+
+let rec purge_decls = function
+  | Decl _ -> Skip
+  | Seq(Decl _,c2) -> purge_decls c2
+  | Seq(c1,Decl _) -> purge_decls c1
+  | Seq(c1,c2) -> Seq(purge_decls c1, purge_decls c2)
+  | Block(vdl,c) -> Block(vdl @ gather_decls c, purge_decls c)
+  | _ as c -> c 
+
+let rec blockify_cmd c = 
+  let vdl = gather_decls c in
+  let c' = purge_decls c in
+  if vdl=[] then blockify_subterms c'
+  else Block(vdl, blockify_subterms c')
+
+and blockify_subterms = function
+  | Block(vdl,c) -> Block(vdl, blockify_subterms c) 
+  | Seq(c1,c2) -> Seq(blockify_subterms c1, blockify_subterms c2) 
+  | If(e,c1,c2) -> If(e, blockify_cmd c1, blockify_cmd c2)
+  | _ as c -> c
+
+let blockify_fun = function
+  | Constr (al,c,p) -> Constr (al,blockify_cmd c,p)
+  | Proc (f,al,c,v,p,r) -> Proc(f,al,blockify_cmd c,v,p,r)
+
+let blockify_contract (Contract(c,el,vdl,fdl)) =
+  Contract(c,el,vdl,List.map blockify_fun fdl)

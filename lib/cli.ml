@@ -2,9 +2,9 @@
 (*                                    Tinysol CLI                             *)
 (******************************************************************************)
 
-open Ast
-open Types
+open Cli_ast
 open Utils
+open Sysstate
 open Main
 open Prettyprint
 

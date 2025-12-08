@@ -41,17 +41,17 @@ type expr =
           
 and cmd =
   | Skip
-  | Assign of ide * expr
-  | MapW of ide * expr * expr
-  | Seq of cmd * cmd
-  | If of expr * cmd * cmd
-  | Send of expr * expr         (* send(e1,e2) transfers e2 wei to e1 *)
-  | Req of expr                 (* require(e) reverts if e is false *) 
-  | Block of var_decl list * cmd
-  | ExecBlock of cmd            (* Runtime only: c is the cmd being reduced *)
-  | Decl of var_decl            (* Static-time only: Decl is converted into block*)
+  | Assign of ide * expr          (* Variable assignment *)
+  | MapW of ide * expr * expr     (* Map assignment *)
+  | Seq of cmd * cmd              (* Sequencing *)
+  | If of expr * cmd * cmd        (* Conditional command *)
+  | Send of expr * expr           (* send(e1,e2) transfers e2 wei to e1 *)
+  | Req of expr                   (* require(e) reverts if e is false *) 
+  | Block of var_decl list * cmd  (* block with declarations *)
+  | ExecBlock of cmd              (* Runtime only: c is the cmd being reduced *)
+  | Decl of var_decl              (* Static-time only: Decl is converted into block*)
   | ProcCall of expr * ide * expr * expr list
-  | ExecProcCall of cmd
+  | ExecProcCall of cmd           (* Runtime only: c is the cmd being reduced *)
   | Return of expr
 
 (* Base types *)
@@ -129,15 +129,3 @@ type transaction = {
   txargs : exprval list;
   txvalue : int;
 }
-
-(******************************************************************************)
-(*                                    Tinysol CLI                             *)
-(******************************************************************************)
-
-type cli_cmd = 
-  | Faucet of addr * int
-  | Deploy of transaction * string
-  | CallFun of transaction
-  | Revert of transaction
-  | Assert of addr * expr
-  | SetBlockNum of int

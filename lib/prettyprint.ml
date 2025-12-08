@@ -1,5 +1,5 @@
 open Ast
-open Types
+open Sysstate
 
 (******************************************************************************)
 (*                            Getting set of variables                        *)
@@ -258,15 +258,3 @@ let string_of_transaction tx =
   tx.txsender ^ ":" ^ tx.txto ^ "." ^ tx.txfun ^
   "{value: " ^ (string_of_int tx.txvalue) ^ "}" ^ 
   "(" ^ string_of_args tx.txargs ^ ")" 
-
-
-(******************************************************************************)
-(*                         Manipulating execution traces                      *)
-(******************************************************************************)
-
-let print_sysstate_id (st : sysstate) : sysstate =
-  st |> string_of_sysstate [] |> print_string |> print_newline |> fun _ -> st
-
-let print_trace_and_return_last_sysstate tr = 
-  let st = last_sysstate tr in
-  tr |> string_of_trace |> print_string |> fun _ -> st

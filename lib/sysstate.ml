@@ -1,42 +1,9 @@
 open Ast
 open Utils
 
-let is_val = function
-  | BoolConst _ 
-  | IntConst _
-  | AddrConst _ -> true
-  | _ -> false
-
-let exprval_of_expr = function
-  | BoolConst b -> (Bool b)
-  | IntConst n  -> (Int n)
-  | AddrConst s -> (Addr s)
-  | _ -> failwith ("expression is not a value")
-
-let int_of_expr e = match e with 
-  | IntConst n  -> n
-  | _ -> failwith "IntConst was expected"
-
-let bool_of_expr e = match e with 
-  | BoolConst b -> b
-  | _  -> failwith "True or False was expected"
-
-let addr_of_expr e = match e with 
-  | AddrConst a -> a
-  | _ -> failwith "AddrConst was expected"
-
-let expr_of_exprval = function
-  | Bool b -> BoolConst b
-  | Int n -> IntConst n
-  | Addr b -> AddrConst b
-  | Map _ -> failwith "step_expr: wrong type checking of map?"
-
-let addr_of_exprval v = match v with 
-  | Addr a -> a
-  | Bool _ -> failwith "value has type Bool but an Addr was expected"
-  | Int _ -> failwith "value has type Int but an Addr was expected"
-  | Map _ -> failwith "value has type Map but an Addr was expected"
-
+(******************************************************************************)
+(*                                 System state                               *)
+(******************************************************************************)
 
 (* local environment: 
     maps local variables, plus sender and value
@@ -70,13 +37,11 @@ type exec_state =
   | Reverted
   | Returned of exprval
 
-let rec last_sysstate = function
-    [] -> failwith "last on empty list"
-  | [St st] -> st
-  | _::l -> last_sysstate l
 
 
-(* Functions to access and manipulate the state *)
+(******************************************************************************)
+(*            Functions to access and manipulate system states                *)
+(******************************************************************************)
 
 let pop_callstack (st : sysstate) : sysstate = match st.callstack with
     [] -> failwith "empty call stack"
@@ -121,7 +86,6 @@ let lookup_balance (a : addr) (st : sysstate) : int =
   try (st.accounts a).balance
   with _ -> 0
 
-
 let lookup_enum_option (st : sysstate) (enum_name : ide) (option_name : ide) : int option = 
   try 
     let a = (List.hd st.callstack).callee in 
@@ -157,19 +121,6 @@ let exists_account (st : sysstate) (a : addr) : bool =
 let exists_ide_in_storage (cs : account_state) (x : ide) : bool = 
   try let _ = cs.storage x in true
   with _ -> false
-
-(* 
-  Updates the variable x to value x in environment stack el. 
-  The variable is searched throughout the environment frames in the stack. 
- *)
-let rec update_env (el : env list) (x : ide) (v : exprval) : env list =
- match el with
-  | [] -> failwith (x ^ " not bound in env")
-  | e::el' -> 
-    try let _ = e x in (* checks if ide x is bound in e *)
-      (bind x v e) :: el'
-    with _ -> e :: (update_env el' x v)
-
 
 (* 
   Updates the variable x to value x in environment stack el. 
@@ -215,3 +166,46 @@ let update_map (st : sysstate) (x:ide) (k:exprval) (v:exprval) : sysstate =
       | _ -> failwith ("update_map: " ^ x ^ " is not a mapping")
       else failwith ("mapping " ^ x ^ " not bound in storage of " ^ a)   
 
+(******************************************************************************)
+(*              Retrieving contracts and functions from state                 *)
+(******************************************************************************)
+
+let find_fun_in_contract (Contract(_,_,_,fdl)) (f : ide) : fun_decl option =
+  List.fold_left 
+  (fun acc fd -> match fd with
+    | Constr(_) -> if acc=None && f="constructor" then Some fd else acc  
+    | Proc(g,_,_,_,_,_) -> if acc=None && f=g then Some fd else acc
+  )
+  None
+  fdl
+
+let find_fun_in_sysstate (st : sysstate) (a : addr) (f : ide) = 
+  if not (exists_account st a) then
+    failwith ("address " ^ a ^ " does not exist")
+  else match (st.accounts a).code with
+    | None -> None  (* "address " ^ a ^ " is not a contract address" *)
+    | Some(c) -> find_fun_in_contract c f 
+
+let get_cmd_from_fun = function
+  | (Constr(_,c,_)) -> c
+  | (Proc(_,_,c,_,_,_)) -> c
+
+let get_var_decls_from_fun = function
+  | (Constr(vdl,_,_)) -> vdl
+  | (Proc(_,vdl,_,_,_,_)) -> vdl
+
+let bind_fargs_aargs (xl : var_decl list) (vl : exprval list) : env =
+  if List.length xl <> List.length vl then
+    failwith "exec_tx: length mismatch between formal and actual arguments"
+  else 
+  List.fold_left2 
+  (fun acc x_decl v -> match (x_decl,v) with 
+   | ((VarT(IntBT,_),x), Int _)
+   | ((VarT(BoolBT,_),x), Bool _) 
+   | ((VarT(AddrBT _,_),x), Addr _) -> bind x v acc
+   | ((VarT(UintBT,_),x), Int n) when n>=0 -> bind x v acc
+   | ((MapT(_),_),_) -> failwith "Maps cannot be passed as function parameters"
+   | _ -> failwith "exec_tx: type mismatch between formal and actual arguments") 
+  botenv 
+  xl 
+  vl 

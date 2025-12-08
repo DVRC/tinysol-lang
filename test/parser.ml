@@ -1,6 +1,5 @@
 open TinysolLib.Ast
 open TinysolLib.Utils
-open TinysolLib.Main
 
 (********************************************************************************
  test_parse_cmd : (command, expected AST)
