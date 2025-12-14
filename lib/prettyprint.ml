@@ -52,7 +52,7 @@ and vars_of_cmd = function
   | If(e,c1,c2) -> union (vars_of_expr e) (union (vars_of_cmd c1) (vars_of_cmd c2))
   | Send(e1,e2) -> union (vars_of_expr e1) (vars_of_expr e2)
   | Req(e) -> vars_of_expr e    
-  | Return(e) -> vars_of_expr e               
+  | Return(el) -> List.fold_left (fun acc e -> union  acc (vars_of_expr e)) [] el               
   | Block(_,c) -> vars_of_cmd c
   | ExecBlock(c) 
   | ExecProcCall(c) -> vars_of_cmd c
@@ -75,6 +75,14 @@ let string_of_exprval = function
   | Uint n -> string_of_int n
   | Addr s -> s
   | Map _  -> "<map>" (* do not expand map *) 
+
+let string_of_exprval_list el = 
+  let rec helper el = match el with 
+    | [] -> ""
+    | e::el' -> "," ^ string_of_exprval e ^ helper el'
+  in match el with
+  | [] -> "" 
+  | e::el' -> "(" ^ string_of_exprval e ^ helper el' ^ ")"
 
 let string_of_visibility = function
   | Public    -> "public"
@@ -132,6 +140,14 @@ let rec string_of_expr = function
     ^ string_of_cmd c 
     ^ ">"
 
+and string_of_expr_list el = 
+  let rec helper el = match el with 
+    | [] -> ""
+    | e::el' -> "," ^ string_of_expr e ^ helper el'
+  in match el with
+  | [] -> "" 
+  | e::el' -> "(" ^ string_of_expr e ^ helper el' ^ ")"
+
 and string_of_cmd = function
   | Skip -> "skip;"
   | Decl d -> string_of_local_var_decl d ^ " ;"
@@ -141,7 +157,7 @@ and string_of_cmd = function
   | If(e,c1,c2) -> "if (" ^ string_of_expr e ^ ") " ^ string_of_cmd c1 ^ " else " ^ string_of_cmd c2 ^ ""
   | Send(e1,e2) -> string_of_expr e1 ^ ".transfer(" ^ (string_of_expr e2) ^ ");"
   | Req(e) -> "require " ^ string_of_expr e ^ ";"
-  | Return e -> "return " ^ string_of_expr e ^ ";"
+  | Return el -> "return " ^ string_of_expr_list el ^ ";"
   | Block(vdl,c) -> "{" 
     ^ List.fold_left (fun s d -> s ^ string_of_local_var_decl d ^ "; ") "" vdl 
     ^ string_of_cmd c 
@@ -189,12 +205,20 @@ let string_of_local_var_decls = List.fold_left (fun s d -> s ^ (if s<>"" then ";
 
 let string_of_fun_args = List.fold_left (fun s d -> s ^ (if s<>"" then ", " else "") ^ string_of_local_var_decl d) ""
 
+let string_of_ret_list tl = 
+    let rec helper tl = match tl with 
+    | [] -> ""
+    | t::tl' -> "," ^ string_of_base_type t ^ helper tl'
+  in match tl with
+  | [] -> "" 
+  | t::tl' -> "returns (" ^ string_of_base_type t ^ helper tl' ^ ")"
+
 let string_of_fun_decl = function 
   | Proc(f,al,c,v,m,ret) -> 
     "function " ^ f ^ "(" ^ (string_of_fun_args al) ^ ") " ^
     add_space (string_of_visibility v) ^
     add_space (string_of_fun_mutability m) ^ 
-    (match ret with None -> "" | Some t -> "returns(" ^ string_of_base_type t ^ ") ") ^ 
+    add_space (string_of_ret_list ret) ^ 
     "{" ^ string_of_cmd c ^ "}\n"
   | Constr(al,c,m) ->       
     "constructor " ^ "(" ^ (string_of_fun_args al) ^ ") " ^
@@ -272,7 +296,7 @@ let string_of_sysstate (evl : ide list) (st : sysstate) =
 let string_of_execstate evl = function
   | St st -> string_of_sysstate evl st
   | Reverted msg -> "revert: " ^ msg
-  | Returned v -> "returned " ^ string_of_exprval v
+  | Returned vl -> "returned " ^ string_of_exprval_list vl
   | CmdSt (c,st) -> 
       "cmd: " ^ (string_of_cmd c) ^ "\n" ^ 
       (string_of_sysstate evl st) 
@@ -281,7 +305,7 @@ let string_of_trace stl = match stl with
   [] -> ""
 | St _::_ -> ""
 | Reverted msg :: _ -> "revert " ^ msg
-| Returned v :: _ -> "returned " ^ string_of_exprval v 
+| Returned vl :: _ -> "returned " ^ string_of_exprval_list vl 
 | CmdSt (c,_)::_ -> let evl = vars_of_cmd c in  
   let rec helper stl = (match stl with
     [] -> ""

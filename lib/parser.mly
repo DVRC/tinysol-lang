@@ -238,7 +238,7 @@ local_var_decl:
 nonseq_cmd:
   | SKIP; CMDSEP;  { Skip }
   | REQ; e = expr; CMDSEP; { Req(e) } 
-  | RETURN; e = expr; CMDSEP; { Return(e) } 
+  | RETURN; el = separated_list(ARGSEP, expr); CMDSEP; { Return(el) } 
   | x = ID; TAKES; e = expr; CMDSEP; { Assign(x,e) }
   | x = ID; ADDTAKES; e = expr; CMDSEP; { Assign(x,Add(Var(x),e)) }
   | x = ID; SUBTAKES; e = expr; CMDSEP; { Assign(x,Sub(Var(x),e)) }
@@ -266,8 +266,8 @@ cmd_eof:
 ;
 
 opt_returns:
-  | RETURNS; LPAREN; t = base_type; RPAREN { Some t }
-  | /* no return */ { None }
+  | RETURNS; LPAREN; tl = separated_list(ARGSEP, base_type); RPAREN { tl }
+  | /* no return */ { [] }
 
 opt_cmd:
   | c = cmd { c}

@@ -275,7 +275,10 @@ let rec step_expr (e,st) = match e with
   | ExecFunCall(c) -> (match step_cmd (CmdSt(c,st)) with
     | St _ -> failwith "function terminated without return"
     | Reverted s -> failwith s
-    | Returned v -> (expr_of_exprval v, pop_callstack st)
+    | Returned vl -> (match vl with
+      | [v] -> (expr_of_exprval v, pop_callstack st)
+      | _ -> failwith "multiple return values not supported"
+    )
     | CmdSt(c',st') -> (ExecFunCall(c'),st')
     )
 
@@ -362,9 +365,10 @@ and step_cmd = function
     | Req(e) -> 
       let (e', st') = step_expr (e, st) in CmdSt(Req(e'), st')
 
-    | Return(e) when is_val e -> Returned (exprval_of_expr e) 
-    | Return(e) -> 
-      let (e', st') = step_expr (e, st) in CmdSt(Return(e'), st')
+    | Return(el) when List.for_all is_val el -> Returned (List.map exprval_of_expr el) 
+    | Return(el) -> (match el with
+      | [e] -> let (e', st') = step_expr (e, st) in CmdSt(Return([e']), st')
+      | _ -> failwith "TODO: multiple return values not supported")
     
     | Block(vdl,c) ->
         let r' = List.fold_left (fun acc vd ->

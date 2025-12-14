@@ -80,7 +80,7 @@ let%test "test_parse_contract_2" = try
   "contract C { uint x; function f() public { x = block.number; } }"
   = 
   (Contract ("C", [], [{ ty=VarT(UintBT); name="x"; visibility=Internal; mutability=Mutable; init_value = None }],
-  [Proc ("f", [], Assign ("x", BlockNum), Public, NonPayable, None)]))
+  [Proc ("f", [], Assign ("x", BlockNum), Public, NonPayable, [])]))
   with _ -> false
 
 let%test "test_parse_contract_3" = try
@@ -88,7 +88,7 @@ let%test "test_parse_contract_3" = try
   "contract C { uint immutable private x; function f() public { x = block.number; } }"
   = 
   (Contract ("C", [], [{ ty=VarT(UintBT); name="x"; visibility=Private; mutability=Immutable; init_value = None }],
-  [Proc ("f", [], Assign ("x", BlockNum), Public, NonPayable, None)]))
+  [Proc ("f", [], Assign ("x", BlockNum), Public, NonPayable, [])]))
   with _ -> false
 
 let test_parse (c : string) (b : bool) = try 

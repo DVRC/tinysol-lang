@@ -35,7 +35,7 @@ type exec_state =
   | St of sysstate 
   | CmdSt of cmd * sysstate
   | Reverted of string
-  | Returned of exprval
+  | Returned of exprval list
 
 
 

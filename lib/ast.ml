@@ -58,7 +58,7 @@ and cmd =
   | Decl of local_var_decl              (* Static-time only: Decl is converted into block*)
   | ProcCall of expr * ide * expr * expr list
   | ExecProcCall of cmd                 (* Runtime only: c is the cmd being reduced *)
-  | Return of expr
+  | Return of expr list
 
 (* Base types *)
 
@@ -129,7 +129,7 @@ and local_var_decl = { ty: var_type; name: ide; }
 
 type fun_decl =
   | Constr of local_var_decl list * cmd * fun_mutability_t
-  | Proc of ide * local_var_decl list * cmd * visibility_t * fun_mutability_t * (base_type option) 
+  | Proc of ide * local_var_decl list * cmd * visibility_t * fun_mutability_t * (base_type list) 
 
 type enum_decl = Enum of (ide * ide list)
 
