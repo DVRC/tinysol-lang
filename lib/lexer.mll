@@ -19,7 +19,7 @@ rule read_token =
   | white { read_token lexbuf }
   | "//" { read_single_line_comment lexbuf }
   | "/*" { read_multi_line_comment lexbuf }
-  | '"'  { read_string (Buffer.create 17) lexbuf }  
+  | '"'  { read_string (Buffer.create 17) lexbuf }
   | "(" { LPAREN }
   | ")" { RPAREN }
   | "{" { LBRACE }
@@ -33,13 +33,13 @@ rule read_token =
   | "||" { OR }
   | "+" { PLUS }
   | "-" { MINUS }
-  | "*" { MUL }  
-  | "/" { DIV }  
+  | "*" { MUL }
+  | "/" { DIV }
   | "==" { EQ }
   | "!=" { NEQ }
-  | "<=" { LEQ }  
+  | "<=" { LEQ }
   | "<" { LT }
-  | ">=" { GEQ }  
+  | ">=" { GEQ }
   | ">" { GT }
   | "=>" { MAPSTO }
   | "this" { THIS }
@@ -61,10 +61,10 @@ rule read_token =
   | "else" { ELSE }
   | "require" { REQ }
   | "return" { RETURN }
-  | "constructor" { CONSTR } 
+  | "constructor" { CONSTR }
   | "function" { FUN }
   | "receive" { RECEIVE }
-  | "," { ARGSEP }  
+  | "," { ARGSEP }
   | "int" { INT }
   | "uint" { UINT }
   | "bool" { BOOL }
@@ -93,7 +93,7 @@ rule read_token =
   | addrlit { ADDRLIT (Lexing.lexeme lexbuf) }
   | num { CONST (Lexing.lexeme lexbuf) }
   | version { VERSION (Lexing.lexeme lexbuf) }
-  | newline { new_line lexbuf; read_token lexbuf }  
+  | newline { new_line lexbuf; read_token lexbuf }
   | eof { EOF }
 
 and read_single_line_comment = parse

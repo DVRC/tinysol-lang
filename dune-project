@@ -5,9 +5,13 @@
 (generate_opam_files true)
 
 (source
- (github username/reponame))
+ (github dvrc/tinysol-lang))
 
-(authors "Author Name <author@example.com>")
+(authors
+	"Davide Ricco <d.ricco@estudenti.unica.it>"
+	"Luca Lampis"
+	"Francesco Meola"
+)
 
 (maintainers "Maintainer Name <maintainer@example.com>")
 
@@ -17,8 +21,9 @@
 
 (package
  (name tinysol-lang)
- (synopsis "A short synopsis")
- (description "A longer description")
+ (synopsis "Subset implementation of Solidity, project for LIP class")
+ (description "A subset implementation of the Solidity language implemented
+ in OCaml, for the programming languages theory class of UniCa")
  (depends ocaml)
  (tags
   ("add topics" "to describe" your project)))

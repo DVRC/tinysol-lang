@@ -71,7 +71,7 @@ open Cli_ast
 %token PAYABLE
 %token IMMUTABLE
 %token CONSTANT
-%token RETURNS 
+%token RETURNS
 
 %token FAUCET
 %token DEPLOY
@@ -104,7 +104,7 @@ open Cli_ast
 %type <fun_decl> fun_decl
 %type <cmd> cmd
 %type <local_var_decl list> formal_args
-%type <expr> expr 
+%type <expr> expr
 
 %start <cmd> cmd_eof
 %start <expr> expr_eof
@@ -134,7 +134,7 @@ contract_vars:
   | /* empty */ { [] }
 
 enum_decl:
-  | ENUM; x = ID; LBRACE; ol = separated_list(ARGSEP, ID); RBRACE { Enum(x,ol) }; 
+  | ENUM; x = ID; LBRACE; ol = separated_list(ARGSEP, ID); RBRACE { Enum(x,ol) };
 
 actual_args:
   | a = separated_list(ARGSEP, value) { a } ;
@@ -227,7 +227,7 @@ opt_var_modifiers:
 opt_init_value:
   | TAKES; v = value; { Some v }
   | /* default */ { None }
-  
+
 var_decl:
   | t = var_type; v_i = opt_var_modifiers; x = ID; iv = opt_init_value { { ty = t; name = x; visibility = fst v_i; mutability = snd v_i; init_value = iv } }
   | t = ID; v_i = opt_var_modifiers; x = ID { { ty = VarT(UnknownBT(t)); name = x; visibility = fst v_i; mutability = snd v_i; init_value = None } }
@@ -244,9 +244,9 @@ opt_id_decons:
 
 nonseq_cmd:
   | SKIP; CMDSEP;  { Skip }
-  | REQ; e = expr; CMDSEP; { Req(e) } 
-  | RETURN; LPAREN; el = separated_nonempty_list(ARGSEP, expr); RPAREN; CMDSEP; { Return(el) } 
-  | RETURN; e = expr; CMDSEP; { Return([e]) } 
+  | REQ; e = expr; CMDSEP; { Req(e) }
+  | RETURN; LPAREN; el = separated_nonempty_list(ARGSEP, expr); RPAREN; CMDSEP; { Return(el) }
+  | RETURN; e = expr; CMDSEP; { Return([e]) }
   | x = ID; TAKES; e = expr; CMDSEP; { Assign(x,e) }
   | x = ID; ADDTAKES; e = expr; CMDSEP; { Assign(x,Add(Var(x),e)) }
   | x = ID; SUBTAKES; e = expr; CMDSEP; { Assign(x,Sub(Var(x),e)) }
@@ -297,11 +297,17 @@ fun_modifiers:
   | m = opt_fun_mutability_t; v = visibility_t { (v,m) }
 
 fun_decl:
-  /* constructor(al) payable? { c } */ 
-  | CONSTR; LPAREN; al = formal_args; RPAREN; m = opt_fun_mutability_t; LBRACE; c = opt_cmd; RBRACE { Constr(al,c,m) }
+  /* constructor(al) payable? { c } */
+  | CONSTR; LPAREN; al = formal_args; RPAREN; m = opt_fun_mutability_t; LBRACE;
+    c = opt_cmd; RBRACE { Constr(al,c,m) }
   /* function f(al) [public|private]? payable? returns(r)? { c } */
-  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; fmod = fun_modifiers; ret = opt_returns; LBRACE; c = opt_cmd; RBRACE { Proc(f,al,c,fst fmod,snd fmod,ret) }
-  | RECEIVE; LPAREN; al = formal_args; RPAREN; fmod = fun_modifiers; ret = opt_returns; LBRACE; c = opt_cmd; RBRACE { Proc("receive",al,c,fst fmod,snd fmod,ret) }
+  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; fmod = fun_modifiers;
+    ret = opt_returns; LBRACE; c = opt_cmd;
+    RBRACE { Proc(f,al,c,fst fmod,snd fmod,ret) }
+ | RECEIVE; LPAREN; al = formal_args; RPAREN; fmod = fun_modifiers;
+    ret = opt_returns; LBRACE; c = opt_cmd;
+    RBRACE { Proc("receive",al,c,fst fmod,snd fmod,ret) }
+/* | RECEIVE; LPAREN; RPAREN; EXTERNAL; PAYABLE; LBRACE; c = opt_cmd; RBRACE { thingus() }; */
 ;
 
 formal_args:
@@ -319,21 +325,21 @@ opt_weivalue_tx:
   | { 0 }
 
 transaction:
-  | s = ADDRLIT; COLON; c = ADDRLIT; v = opt_weivalue_tx; LPAREN; al = actual_args; RPAREN 
+  | s = ADDRLIT; COLON; c = ADDRLIT; v = opt_weivalue_tx; LPAREN; al = actual_args; RPAREN
   { { txsender = s;
       txto = c;
       txfun = "constructor";
       txargs = al;
       txvalue = v;
   } }
-  | s = ADDRLIT; COLON; c = ADDRLIT; DOT; f = ID; v = opt_weivalue_tx; LPAREN; al = actual_args; RPAREN 
+  | s = ADDRLIT; COLON; c = ADDRLIT; DOT; f = ID; v = opt_weivalue_tx; LPAREN; al = actual_args; RPAREN
   { { txsender = s;
       txto = c;
       txfun = f;
       txargs = al;
       txvalue = v;
   } }
-  | s = ADDRLIT; COLON; c = ADDRLIT; DOT; RECEIVE; v = opt_weivalue_tx; LPAREN; al = actual_args; RPAREN 
+  | s = ADDRLIT; COLON; c = ADDRLIT; DOT; RECEIVE; v = opt_weivalue_tx; LPAREN; al = actual_args; RPAREN
   { { txsender = s;
       txto = c;
       txfun = "receive";
