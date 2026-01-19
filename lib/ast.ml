@@ -78,7 +78,7 @@ and base_type =
  *)
 
 (* Exprval: values associated to (contract and local) variables *)
-and var_type = VarT of base_type | MapT of base_type * base_type (*~ Are maps K/V pairs? *)
+and var_type = VarT of base_type | MapT of base_type * base_type (*~ Are MapT K/V pairs? *)
 
 and visibility_t =
   | Public
@@ -86,13 +86,13 @@ and visibility_t =
   | Internal
   | External
 
-and fun_mutability_t = (*~ Kind of function *)
+and fun_mutability_t = (*~ function modifiers *)
   | Payable
   | NonPayable
   | View
   | Pure
 
-and var_mutability_t = (*~ Kind of variable *)
+and var_mutability_t = (*~ variable modifiers *)
   | Constant
   | Immutable
   | Mutable
@@ -128,7 +128,9 @@ and local_var_decl = {
 (* Function declarations
   - the constructor is always public, and it can be payable
   - functions can be either public or private, and they can be payable
- *)
+*)
+(*~ Procedure/fun: identified * parameters * command * visibility * mutability * args returned *)
+
 type fun_decl =
   | Constr of local_var_decl list * cmd * fun_mutability_t
   | Proc of ide * local_var_decl list * cmd * visibility_t * fun_mutability_t * (base_type list)

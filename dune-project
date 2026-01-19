@@ -9,11 +9,9 @@
 
 (authors
 	"Davide Ricco <d.ricco@estudenti.unica.it>"
-	"Luca Lampis"
-	"Francesco Meola"
+	"Luca Lampis <f.meola@studenti.unica.it>"
+	"Francesco Meola <l.lampis18@studenti.unica.it"
 )
-
-(maintainers "Maintainer Name <maintainer@example.com>")
 
 (license LICENSE)
 

@@ -1,0 +1,12 @@
+Issues to implement:
+- 2: short circuit semantics for booleans
+- 6: typechecker must check that receive is "external payable"
+- 8: typechecker support for state variables declared as constant
+- 12: typechecker support for funciton returning multiple values
+
+Status:
+- 2: passes the 4 tests in test/shortcut.ml (more testing needed)
+- 6: passes the 4 tests in test/externpay.ml (more testing needed)
+
+Other things:
+- add more tests

@@ -298,16 +298,11 @@ fun_modifiers:
 
 fun_decl:
   /* constructor(al) payable? { c } */
-  | CONSTR; LPAREN; al = formal_args; RPAREN; m = opt_fun_mutability_t; LBRACE;
-    c = opt_cmd; RBRACE { Constr(al,c,m) }
+  | CONSTR; LPAREN; al = formal_args; RPAREN; m = opt_fun_mutability_t;
+    LBRACE; c = opt_cmd; RBRACE { Constr(al,c,m) }
   /* function f(al) [public|private]? payable? returns(r)? { c } */
-  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; fmod = fun_modifiers;
-    ret = opt_returns; LBRACE; c = opt_cmd;
-    RBRACE { Proc(f,al,c,fst fmod,snd fmod,ret) }
- | RECEIVE; LPAREN; al = formal_args; RPAREN; fmod = fun_modifiers;
-    ret = opt_returns; LBRACE; c = opt_cmd;
-    RBRACE { Proc("receive",al,c,fst fmod,snd fmod,ret) }
-/* | RECEIVE; LPAREN; RPAREN; EXTERNAL; PAYABLE; LBRACE; c = opt_cmd; RBRACE { thingus() }; */
+  | FUN; f = ID; LPAREN; al = formal_args; RPAREN; fmod = fun_modifiers; ret = opt_returns; LBRACE; c = opt_cmd; RBRACE { Proc(f,al,c,fst fmod,snd fmod,ret) }
+  | RECEIVE; LPAREN; al = formal_args; RPAREN; fmod = fun_modifiers; ret = opt_returns; LBRACE; c = opt_cmd; RBRACE { Proc("receive",al,c,fst fmod,snd fmod,ret) }
 ;
 
 formal_args:

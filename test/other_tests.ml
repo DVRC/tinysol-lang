@@ -38,7 +38,7 @@ let%test "test_shortcut_4" = test_exec_tx
   ["0xA:0xC.f()"; "0xA:0xC.f()"]
   [("x==5");]
 
-(*~ Variable mutability ?*)
+(*~ Function mutability ? *)
 let%test "test_mutability_1" = test_exec_tx
   "contract C {
       uint x;
@@ -120,6 +120,7 @@ let%test "test_receive_2" = test_exec_fun
      does not properly push frames on the call stack *)
 
 
+(*~ Typechecker mutability test *)
 let%test "test_typecheck_mutability_1" = test_typecheck
   "contract C {
       uint x;
@@ -178,6 +179,7 @@ let%test "test_typecheck_return_2" = test_typecheck
   }"
   false
 
+(* Procedure call *)
 let%test "test_typecheck_proccall_1" = test_typecheck
   "contract C {
     int x;
@@ -194,6 +196,7 @@ let%test "test_typecheck_funcall_1" = test_typecheck
   }"
   false
 
+(*~ State variables cannot have external visibility *)
 let%test "test_typecheck_visibility_1" = test_typecheck
   "contract C {
     uint external x;
@@ -244,6 +247,7 @@ let%test "test_typecheck_visibility_2" = test_typecheck
   false (* f is declared as external, so it cannot be invoked through an internal call *)
 *)
 
+(*~ State variables declared as constant *)
 let%test "test_typecheck_constant_1" = test_typecheck
   "contract C {
     int constant N=1;

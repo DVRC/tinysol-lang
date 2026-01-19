@@ -11,6 +11,7 @@ let%test "test_shortcut_1" = test_exec_tx
   ["0xA:0xC.f()"]
   [("x==1");]
 
+(*~ Consecutive calls ? *)
 let%test "test_shortcut_2" = test_exec_tx
   "contract C {
       uint x;

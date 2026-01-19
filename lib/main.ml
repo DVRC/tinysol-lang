@@ -42,7 +42,8 @@ let rec step_expr (e,st) = match e with
   | And(e1,e2) when is_val e1 && is_val e2 ->
     let (b1,b2) = bool_of_expr e1,bool_of_expr e2 in
     (BoolConst (b1 && b2), st)
-  | And(e1,e2) when is_val e1 -> (*~ only e1 has been evaulated *)
+  (*~ only e1 has been evaulated *)
+  | And(e1,e2) when is_val e1 ->
     if bool_of_expr e1 = false then (BoolConst false, st) else
     let (e2', st') = step_expr (e2, st) in (And(e1,e2'), st')
   | And(e1,e2) ->
@@ -51,7 +52,8 @@ let rec step_expr (e,st) = match e with
   | Or(e1,e2) when is_val e1 && is_val e2 ->
     let (b1,b2) = bool_of_expr e1,bool_of_expr e2 in
     (BoolConst(b1 || b2), st)
-  | Or(e1,e2) when is_val e1 -> (*~ Only e1 has been evaluated *)
+ (*~ Only e1 has been evaluated *)
+  | Or(e1,e2) when is_val e1 ->
     if bool_of_expr e1 then (BoolConst true, st) else
     let (e2', st') = step_expr (e2, st) in (Or(e1,e2'), st')
   | Or(e1,e2) ->
@@ -541,18 +543,21 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : (sysstate,string
   else if (exists_account st tx.txto) && tx.txfun = "constructor" then
     Error ("calling constructor in already deployed contract at address " ^ tx.txto)
   else try (
-    let (sender_state : account_state) =
-      { (st.accounts tx.txsender) with balance = (st.accounts tx.txsender).balance - tx.txvalue } in
+    let (sender_state : account_state) = {
+      (st.accounts tx.txsender) with balance =
+      (st.accounts tx.txsender).balance - tx.txvalue
+    } in
     (* updates state of "to" address. If not created yet, deploys the contract *)
     let (to_state : account_state),(deploy : bool) =
-      if exists_account st tx.txto
-      then    { (st.accounts tx.txto) with balance = (st.accounts tx.txto).balance + tx.txvalue },
-              false (* deploy=false ==> cannot call constructor *)
+      if exists_account st tx.txto then {
+        (st.accounts tx.txto) with balance =
+        (st.accounts tx.txto).balance + tx.txvalue
+      }, false (* deploy=false ==> cannot call constructor *)
       else (match tx.txargs with
           | Addr(code)::_ ->
-            (try let c = code |> parse_contract |> preprocess_contract in
-               { balance=tx.txvalue; storage = init_storage c; code = Some c },
-               true (* deploy=true ==> must call constructor *)
+            (try let c = code |> parse_contract |> preprocess_contract in {
+                 balance = tx.txvalue; storage = init_storage c; code = Some c
+               }, true (* deploy = true ==> must call constructor *)
              with _ -> failwith ("exec_tx: syntax error in contract code: " ^ code))
           | _ -> failwith "exec_tx: the first parameter of a deploy transaction must be the contract code")
     in
@@ -566,26 +571,24 @@ let exec_tx (n_steps : int) (tx: transaction) (st : sysstate) : (sysstate,string
           if tx.txvalue > 0 then
             Error "The deployed contract should have a payable constructor if you send value"
           else
-            Ok { accounts = st.accounts
-                   |> bind tx.txsender sender_state
-                   |> bind tx.txto to_state;
-                 callstack = st.callstack;
-                 blocknum = st.blocknum;
-                 active = tx.txto :: st.active }
-        | Some (Proc(_,xl,c,_,m,_))
+            Ok {
+              accounts = st.accounts
+                |> bind tx.txsender sender_state
+                |> bind tx.txto to_state;
+              callstack = st.callstack;
+              blocknum = st.blocknum;
+              active = tx.txto :: st.active
+            }
+        | Some (Proc(_,xl,c,_,m,_)) (*~ function execution *)
         | Some (Constr(xl,c,m)) ->
-          if m<>Payable && tx.txvalue>0 then
+          if m <> Payable && tx.txvalue > 0 then
             Error "sending ETH to a non-payable function"
           else
-            let xl',vl' =
-              if deploy then match tx.txargs with
-                  _::al ->
-                  { ty=VarT(AddrBT false); name="msg.sender"; } ::
-                  { ty=VarT(UintBT); name="msg.value"; } :: xl
-                  ,
-                  Addr tx.txsender ::
-                  Uint tx.txvalue ::
-                  al
+            let xl', vl' =
+              if deploy then match tx.txargs with _::al ->
+                  { ty = VarT(AddrBT false); name="msg.sender"; } ::
+                  { ty = VarT(UintBT); name="msg.value"; } :: xl,
+                  Addr tx.txsender :: Uint tx.txvalue :: al
                 | _ -> assert(false) (* should never happen *)
               else
                 { ty=VarT(AddrBT false); name="msg.sender"; } ::

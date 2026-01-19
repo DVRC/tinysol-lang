@@ -32,10 +32,10 @@ let rec string_of_exprtype = function
   - Ok():       if all static checks passed
   - Error log:  if some checks did not pass; the log collects all the errors found
  *)
-type typecheck_result = (unit,exn list) result
+type typecheck_result = (unit, exn list) result
 
 (* >> merges two contract typechecker results *)
-let (>>)  (out1 : typecheck_result) (out2 : typecheck_result) : typecheck_result =
+let (>>) (out1: typecheck_result) (out2: typecheck_result): typecheck_result =
   match out1 with
   | Ok () -> out2
   | Error log1 -> match out2 with
@@ -43,22 +43,24 @@ let (>>)  (out1 : typecheck_result) (out2 : typecheck_result) : typecheck_result
     | Error log2 -> Error (log1 @ log2)
 
 (* the result of the expression typechecker is either:
-  - Ok(t):      if all static checks passed, and t is the inferred type of the expression
-  - Error log:  if some checks did not pass; the log collects all the errors found
+ - Ok(t):      if all static checks passed, and t is the inferred type of the expression
+ - Error log:  if some checks did not pass; the log collects all the errors found
  *)
 
 type typecheck_expr_result = (exprtype,exn list) result
 
 (* >>+ merges two expression typechecker results *)
-let (>>+)  (out1 : typecheck_expr_result) (out2 : typecheck_expr_result) : typecheck_expr_result =
+let (>>+) (out1: typecheck_expr_result) (out2: typecheck_expr_result):
+  typecheck_expr_result =
   match out1,out2 with
-  | Ok _,Ok _ -> assert(false) (* should not happen *)
+  | Ok _, Ok _ -> assert(false) (* should not happen *)
   | Ok _, Error log2 -> Error log2
   | Error log1, Ok _ -> Error log1
-  | Error log1,Error log2 -> Error (log1 @ log2)
+  | Error log1, Error log2 -> Error (log1 @ log2)
 
 (* boring cast from expression typechecker result to contract typechecker result*)
-let typeckeck_result_from_expr_result (out : typecheck_expr_result) : typecheck_result =
+let typeckeck_result_from_expr_result (out: typecheck_expr_result):
+  typecheck_result =
   match out with
   | Error log -> Error log
   | Ok(_) -> Ok()
@@ -76,26 +78,40 @@ exception EnumDupName of ide
 exception EnumDupOption of ide * ide
 exception MapInLocalDecl of ide * ide
 
+(*~ Adding new exceptions, since that I need *)
+exception NonEmptyArgs of ide
+exception NonEmptyReturn of ide
+exception NotExternPay of ide * visibility_t * fun_mutability_t
+
+(*~ Construct a string with the function name and debug infor *)
 let logfun f s = "(" ^ f ^ ")\t" ^ s
 
 (* Prettyprinting of typechecker errors *)
 let string_of_typecheck_error = function
-| TypeError (f,e,t1,t2) ->
+  | TypeError (f,e,t1,t2) ->
     logfun f
-    "expression " ^ (string_of_expr e) ^
+      "expression " ^ (string_of_expr e) ^
     " has type " ^ string_of_exprtype t1 ^
     " but is expected to have type " ^ string_of_exprtype t2
-| NotMapError (f,e) -> logfun f (string_of_expr e) ^ " is not a mapping"
-| ImmutabilityError (f,x) -> logfun f "variable " ^ x ^ " was declared as immutable, but is used as mutable"
-| UndeclaredVar (f,x) -> logfun f "variable " ^ x ^ " is not declared"
-| MultipleDecl x -> "variable " ^ x ^ " is declared multiple times"
-| MultipleLocalDecl (f,x) -> logfun f "variable " ^ x ^ " is declared multiple times"
-| EnumNameNotFound (f,x) -> logfun f "enum ^ " ^ x ^ " is not declared"
-| EnumOptionNotFound (f,x,o) -> logfun f "enum option " ^ o ^ " is not found in enum " ^ x
-| EnumDupName x -> "enum " ^ x ^ " is declared multiple times"
-| EnumDupOption (x,o) -> "enum option " ^ o ^ " is declared multiple times in enum " ^ x
-| MapInLocalDecl (f,x) -> logfun f "mapping " ^ x ^ " not admitted in local declaration"
-| ex -> Printexc.to_string ex
+  | NotMapError (f,e) -> logfun f (string_of_expr e) ^ " is not a mapping"
+  | ImmutabilityError (f,x) ->
+    logfun f "variable " ^ x ^ " was declared as immutable, but is used as mutable"
+  | UndeclaredVar (f,x) -> logfun f "variable " ^ x ^ " is not declared"
+  | MultipleDecl x -> "variable " ^ x ^ " is declared multiple times"
+  | MultipleLocalDecl (f,x) ->
+    logfun f "variable " ^ x ^ " is declared multiple times"
+  | EnumNameNotFound (f,x) -> logfun f "enum ^ " ^ x ^ " is not declared"
+  | EnumOptionNotFound (f,x,o) ->
+    logfun f "enum option " ^ o ^ " is not found in enum " ^ x
+  | EnumDupName x -> "enum " ^ x ^ " is declared multiple times"
+  | EnumDupOption (x,o) ->
+    "enum option " ^ o ^ " is declared multiple times in enum " ^ x
+  | MapInLocalDecl (f,x) ->
+    logfun f "mapping " ^ x ^ " not admitted in local declaration"
+  | NotExternPay (f, _, _) -> logfun f "must be declared as \"external payable\" "
+  | NonEmptyArgs (f) -> logfun f "mustn't have arguments"
+  | NonEmptyReturn (f) -> logfun f "must not return anything"
+  | ex -> Printexc.to_string ex
 
 let exprtype_of_decltype = function
   | IntBT         -> IntET
@@ -118,37 +134,43 @@ let get_state_var_decls (avdl : all_var_decls) : var_decl list = fst avdl
 let get_local_var_decls (avdl : all_var_decls) : local_var_decl list = snd avdl
 
 (* merges a list of state variable decls and a list of local variable decls *)
-let merge_var_decls (vdl : var_decl list) (lvdl : local_var_decl list) : all_var_decls = vdl , lvdl
+let merge_var_decls (vdl: var_decl list) (lvdl: local_var_decl list) : all_var_decls =
+  vdl , lvdl
 
 (* adds a list of local variables to all_var_decls *)
-let push_local_decls ((vdl: var_decl list),(old_lvdl : local_var_decl list)) new_lvdl =
-  (vdl , new_lvdl @ old_lvdl)
+let push_local_decls ((vdl: var_decl list), (old_lvdl: local_var_decl list)) new_lvdl =
+  (vdl, new_lvdl @ old_lvdl)
 
-let lookup_type (x : ide) (avdl : all_var_decls) : exprtype option =
-  if x="msg.sender" then Some (AddrET false)
-  else if x="msg.value" then Some UintET else
+(*~ How lookup works:
+ *)
+let lookup_type (x: ide) (avdl: all_var_decls): exprtype option =
+  if x = "msg.sender" then
+    Some (AddrET false)
+  else if x = "msg.value" then
+    Some UintET
+  else
   (* first lookup the local variables *)
   avdl
   |> get_local_var_decls
   |> List.map (fun (vd : local_var_decl) -> match vd.ty with
     | VarT(t)   -> (exprtype_of_decltype t),vd.name
-    | MapT(tk,tv) -> MapET(exprtype_of_decltype tk, exprtype_of_decltype tv),vd.name)
-  |> List.fold_left
-  (fun acc (t,y) -> if acc=None && x=y then Some t else acc)
-  None
-  |>
-  fun res -> match res with
+    | MapT(tk,tv) -> MapET(exprtype_of_decltype tk, exprtype_of_decltype tv), vd.name)
+  |> List.fold_left (fun acc (t,y) -> if acc = None && x = y then Some t else acc) None
+  |> fun res -> match res with
     | Some t -> Some t
-    | None -> (* if not found, lookup the state variables *)
-      avdl
+    | None -> avdl (* if not found, lookup the state variables *)
       |> get_state_var_decls
       |> List.map (fun (vd : var_decl) -> match vd.ty with
         | VarT(t)   -> (exprtype_of_decltype t),vd.name
-        | MapT(tk,tv) -> MapET(exprtype_of_decltype tk, exprtype_of_decltype tv),vd.name)
+        | MapT(tk,tv) -> MapET(exprtype_of_decltype tk, exprtype_of_decltype tv), vd.name)
       |> List.fold_left
-      (fun acc (t,y) -> if acc=None && x=y then Some t else acc)
+      (fun acc (t, y) -> if acc = None && x = y then Some t else acc)
       None
 
+(*~ Totally awful name.
+ * I thought "dup" was intended in an "imperative" sense.
+ * Would make sense naming this as "any_dup" (as existence qualifier)
+ *)
 let rec dup = function
   | [] -> None
   | x::l -> if List.mem x l then Some x else dup l
@@ -160,13 +182,18 @@ let no_dup_var_decls vdl =
   vdl
   |> List.map (fun (vd : var_decl) -> vd.name)
   |> dup
-  |> fun res -> match res with None -> Ok () | Some x -> Error ([MultipleDecl x])
+  |> fun res -> match res with
+    None -> Ok ()
+  | Some x -> Error ([MultipleDecl x])
 
-let no_dup_local_var_decls f vdl =
-  vdl
-  |> List.map (fun (vd : local_var_decl) -> vd.name)
+(*~ Changed names for clarity *)
+let no_dup_local_var_decls fname vardecl_l =
+  vardecl_l
+  |> List.map (fun (vd: local_var_decl) -> vd.name)
   |> dup
-  |> fun res -> match res with None -> Ok () | Some x -> Error ([MultipleLocalDecl (f,x)])
+  |> fun res -> match res with
+    None -> Ok ()
+  | Some x -> Error ([MultipleLocalDecl (fname ,x)])
 
 let no_dup_fun_decls vdl =
   vdl
@@ -190,7 +217,8 @@ let rec typecheck_expr (f : ide) (edl : enum_decl list) vdl = function
 
   | IntConst n -> Ok (IntConstET n)
 
-  | IntVal _ | UintVal _ -> assert(false) (* these expressions only occur at runtime *)
+  | IntVal _ | UintVal _ ->
+    assert(false) (* these expressions only occur at runtime *)
 
   | AddrConst _ -> Ok (AddrET false)
 
@@ -198,48 +226,57 @@ let rec typecheck_expr (f : ide) (edl : enum_decl list) vdl = function
 
   | This -> Ok(AddrET false) (* TODO: check coherence with Solidity *)
 
-  | Var x -> (match lookup_type x vdl with
+  | Var x ->
+    (match lookup_type x vdl with
     | Some t -> Ok(t)
     | None -> Error [UndeclaredVar (f,x)])
 
-  | MapR(e1,e2) -> (match (typecheck_expr f edl vdl e1, typecheck_expr f edl vdl e2) with
-    | Ok(MapET(t1k,t1v)),Ok(t2) when t2 = t1k -> Ok(t1v)
-    | Ok(MapET(t1k,_)),Ok(t2) -> Error [TypeError (f,e2,t2,t1k)]
-    | _ -> Error [NotMapError(f,e1)]
-    )
+  | MapR(e1,e2) ->
+    (match (typecheck_expr f edl vdl e1, typecheck_expr f edl vdl e2) with
+     | Ok(MapET(t1k, t1v)), Ok(t2) when t2 = t1k -> Ok(t1v)
+     | Ok(MapET(t1k, _)), Ok(t2) -> Error [TypeError (f,e2,t2,t1k)]
+     | _ -> Error [NotMapError(f,e1)])
 
-  | BalanceOf(e) -> (match typecheck_expr f edl vdl e with
-        Ok(AddrET(_)) -> Ok(UintET)
-      | Ok(t) -> Error [TypeError (f,e,t,AddrET(false))]
-      | _ as err -> err)
+  | BalanceOf(e) ->
+    (match typecheck_expr f edl vdl e with
+       Ok(AddrET(_)) -> Ok(UintET)
+     | Ok(t) -> Error [TypeError (f,e,t,AddrET(false))]
+     | _ as err -> err)
 
-  | Not(e) -> (match typecheck_expr f edl vdl e with
-      | Ok(BoolConstET b) -> Ok(BoolConstET (not b))
-      | Ok(BoolET) -> Ok(BoolET)
-      | Ok(t) -> Error [TypeError (f,e,t,BoolET)]
-      | _ as err -> err)
+  | Not(e) ->
+    (match typecheck_expr f edl vdl e with
+     | Ok(BoolConstET b) -> Ok(BoolConstET (not b))
+     | Ok(BoolET) -> Ok(BoolET)
+     | Ok(t) -> Error [TypeError (f,e,t,BoolET)]
+     | _ as err -> err)
 
   | And(e1,e2) ->
     (match (typecheck_expr f edl vdl e1,typecheck_expr f edl vdl e2) with
-     | Ok(BoolConstET false),Ok(t2) when subtype t2 BoolET -> Ok(BoolConstET false)
-     | Ok(t1),Ok(BoolConstET false) when subtype t1 BoolET -> Ok(BoolConstET false)
-     | Ok(t1),Ok(t2) when subtype t1 BoolET && subtype t2 BoolET -> Ok(BoolET)
-     | Ok(t1),_ when not (subtype t1 BoolET) -> Error [TypeError (f,e1,t1,BoolET)]
+     | Ok(BoolConstET false), Ok(t2) when subtype t2 BoolET ->
+       Ok(BoolConstET false)
+     | Ok(t1), Ok(BoolConstET false) when subtype t1 BoolET ->
+       Ok(BoolConstET false)
+     | Ok(t1), Ok(t2) when subtype t1 BoolET && subtype t2 BoolET -> Ok(BoolET)
+     | Ok(t1), _ when not (subtype t1 BoolET) ->
+       Error [TypeError (f,e1,t1,BoolET)]
      | _,Ok(t) -> Error [TypeError (f,e2,t,BoolET)]
      | err1,err2 -> err1 >>+ err2)
 
   | Or(e1,e2) ->
     (match (typecheck_expr f edl vdl e1,typecheck_expr f edl vdl e2) with
-     | Ok(BoolConstET true),Ok(t2) when subtype t2 BoolET -> Ok(BoolConstET true)
-     | Ok(t1),Ok(BoolConstET true) when subtype t1 BoolET -> Ok(BoolConstET true)
-     | Ok(t1),Ok(t2) when subtype t1 BoolET && subtype t2 BoolET -> Ok(BoolET)
-     | Ok(t1),_ when not (subtype t1 BoolET) -> Error [TypeError (f,e1,t1,BoolET)]
-     | _,Ok(t2) -> Error [TypeError (f,e2,t2,BoolET)]
-     | err1,err2 -> err1 >>+ err2)
+     | Ok(BoolConstET true), Ok(t2) when subtype t2 BoolET ->
+       Ok(BoolConstET true)
+     | Ok(t1), Ok(BoolConstET true) when subtype t1 BoolET ->
+       Ok(BoolConstET true)
+     | Ok(t1), Ok(t2) when subtype t1 BoolET && subtype t2 BoolET -> Ok(BoolET)
+     | Ok(t1), _ when not (subtype t1 BoolET) ->
+       Error [TypeError (f,e1,t1,BoolET)]
+     | _, Ok(t2) -> Error [TypeError (f, e2, t2, BoolET)]
+     | err1, err2 -> err1 >>+ err2)
 
   | Add(e1,e2) ->
-    (match (typecheck_expr f edl vdl e1,typecheck_expr f edl vdl e2) with
-     | Ok(IntConstET n1),Ok(IntConstET n2) -> Ok(IntConstET (n1+n2))
+    (match (typecheck_expr f edl vdl e1, typecheck_expr f edl vdl e2) with
+     | Ok(IntConstET n1), Ok(IntConstET n2) -> Ok(IntConstET (n1+n2))
      | Ok(t1),Ok(t2) when subtype t1 UintET && subtype t2 UintET -> Ok(UintET)
      | Ok(t1),Ok(t2) when subtype t1 IntET && subtype t2 IntET -> Ok(IntET)
      | Ok(t1),_ when not (subtype t1 IntET) -> Error [TypeError (f,e1,t1,IntET)]
@@ -247,7 +284,7 @@ let rec typecheck_expr (f : ide) (edl : enum_decl list) vdl = function
      | err1,err2 -> err1 >>+ err2)
 
   | Sub(e1,e2) ->
-    (match (typecheck_expr f edl vdl e1,typecheck_expr f edl vdl e2) with
+    (match (typecheck_expr f edl vdl e1, typecheck_expr f edl vdl e2) with
      | Ok(IntConstET n1),Ok(IntConstET n2) -> Ok(IntConstET (n1-n2))
      | Ok(t1),Ok(t2) when subtype t1 UintET && subtype t2 UintET -> Ok(UintET)
      | Ok(t1),Ok(t2) when subtype t1 IntET && subtype t2 IntET -> Ok(IntET)
@@ -256,7 +293,7 @@ let rec typecheck_expr (f : ide) (edl : enum_decl list) vdl = function
      | err1,err2 -> err1 >>+ err2)
 
   | Mul(e1,e2) ->
-    (match (typecheck_expr f edl vdl e1,typecheck_expr f edl vdl e2) with
+    (match (typecheck_expr f edl vdl e1, typecheck_expr f edl vdl e2) with
      | Ok(IntConstET n1),Ok(IntConstET n2) -> Ok(IntConstET (n1*n2))
      | Ok(t1),Ok(t2) when subtype t1 UintET && subtype t2 UintET -> Ok(UintET)
      | Ok(t1),Ok(t2) when subtype t1 IntET && subtype t2 IntET -> Ok(IntET)
@@ -272,7 +309,8 @@ let rec typecheck_expr (f : ide) (edl : enum_decl list) vdl = function
      | Ok(t1),Ok(t2) when t1=t2-> Ok(BoolET)
      | Ok(t1),Ok(t2) when subtype t1 UintET && subtype t2 UintET -> Ok(BoolET)
      | Ok(t1),Ok(t2) when subtype t1 IntET && subtype t2 IntET -> Ok(BoolET)
-     | Ok(t1),Ok(t2) when subtype t1 t2 && subtype t2 t1 -> Ok(BoolET) (* AddrET _ *)
+     | Ok(t1),Ok(t2) when subtype t1 t2 && subtype t2 t1 ->
+       Ok(BoolET) (* AddrET _ *)
      | Ok(t1),Ok(t2) -> Error [TypeError (f,e2,t2,t1)]
      | err1,err2 -> err1 >>+ err2)
 
@@ -282,7 +320,8 @@ let rec typecheck_expr (f : ide) (edl : enum_decl list) vdl = function
      | Ok(t1),Ok(t2) when t1=t2-> Ok(BoolET)
      | Ok(t1),Ok(t2) when subtype t1 UintET && subtype t2 UintET -> Ok(BoolET)
      | Ok(t1),Ok(t2) when subtype t1 IntET && subtype t2 IntET -> Ok(BoolET)
-     | Ok(t1),Ok(t2) when subtype t1 t2 && subtype t2 t1 -> Ok(BoolET) (* AddrET _ *)
+     | Ok(t1),Ok(t2) when subtype t1 t2 && subtype t2 t1 ->
+       Ok(BoolET) (* AddrET _ *)
      | Ok(t1),Ok(t2) -> Error [TypeError (f,e2,t2,t1)]
      | err1,err2 -> err1 >>+ err2)
 
@@ -323,7 +362,10 @@ let rec typecheck_expr (f : ide) (edl : enum_decl list) vdl = function
      | err1,err2 -> err1 >>+ err2)
 
   | IfE(e1,e2,e3) ->
-    (match (typecheck_expr f edl vdl e1,typecheck_expr f edl vdl e2, typecheck_expr f edl vdl e3) with
+    (match (typecheck_expr f edl vdl e1,
+            typecheck_expr f edl vdl e2,
+            typecheck_expr f edl vdl e3)
+     with
      | Ok(BoolConstET true),Ok(t2),_ -> Ok(t2)
      | Ok(BoolConstET false),_,Ok(t3) -> Ok(t3)
      | Ok(BoolET),Ok(t2),Ok(t3) when subtype t2 t3 -> Ok(t3)
@@ -359,8 +401,8 @@ let rec typecheck_expr (f : ide) (edl : enum_decl list) vdl = function
 
   | EnumOpt(enum_name,option_name) ->
       edl
-      |> List.filter (fun (Enum(y,_)) -> y=enum_name)
-      |> fun edl -> (match edl with [Enum(_,ol)] -> Some ol | _ -> None)
+      |> List.filter (fun (Enum(y, _)) -> y = enum_name)
+      |> fun edl -> (match edl with [Enum(_, ol)] -> Some ol | _ -> None)
       |> fun l_opt -> (match l_opt with
         | None -> Error [EnumNameNotFound (f,enum_name)]
         | Some ol -> (match find_index (fun o -> o=option_name) ol with
@@ -383,74 +425,78 @@ let rec typecheck_expr (f : ide) (edl : enum_decl list) vdl = function
   | ExecFunCall(_) -> assert(false) (* this should not happen at static time *)
 
 let is_immutable (x : ide) (vdl : var_decl list) =
-  List.fold_left (fun acc (vd : var_decl) -> acc || (vd.name=x && vd.mutability<>Mutable)) false vdl
+  List.fold_left (fun acc (vd : var_decl) ->
+      acc || (vd.name = x && vd.mutability <> Mutable)) false vdl
 
-let typecheck_local_decls (f : ide) (vdl : local_var_decl list) = List.fold_left
+(*~ f is an identifier of the procedure,
+ * vdl here is the arguments list (?)
+ * In any case, it checks that for each var declaration there aren't
+ * variables of mapping type.
+ * If there are, it returns an error
+ *)
+let typecheck_local_decls (f: ide) (vdl: local_var_decl list) = List.fold_left
   (fun acc vd -> match vd.ty with
-    | MapT(_) -> acc >> Error [MapInLocalDecl (f,vd.name)]
+    | MapT(_) -> acc >> Error [MapInLocalDecl (f, vd.name)]
     | _ -> acc)
   (Ok ())
   vdl
 
-let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) = function
+(*~ Check the commands inside a function. *)
+let rec typecheck_cmd (f: ide) (edl: enum_decl list) (vdl: all_var_decls) = function
     | Skip -> Ok ()
 
     | Assign(x,e) ->
-        (* the immutable modifier is not checked for the constructor *)
-        if f <> "constructor" && is_immutable x (get_state_var_decls vdl) then Error [ImmutabilityError (f,x)]
-        else (
-          match typecheck_expr f edl vdl e,typecheck_expr f edl vdl (Var x) with
-          | Ok(te),Ok(tx) -> if subtype te tx then Ok() else Error [TypeError (f,e,te,tx)]
-          | res1,res2 -> typeckeck_result_from_expr_result (res1 >>+ res2)
-        )
+      (* the immutable modifier is not checked for the constructor *)
+      if f <> "constructor" && is_immutable x (get_state_var_decls vdl) then
+        Error [ImmutabilityError (f,x)]
+      else (
+        match typecheck_expr f edl vdl e, typecheck_expr f edl vdl (Var x) with
+        | Ok(te), Ok(tx) -> if subtype te tx
+          then Ok() else Error [TypeError (f,e,te,tx)]
+        | res1, res2 -> typeckeck_result_from_expr_result (res1 >>+ res2)
+      )
 
-    | Decons(_) -> failwith "TODO: multiple return values"
+    | Decons(_) -> failwith "TODO: multiple return values" (*~ Implement me *)
 
-    | MapW(x,ek,ev) ->
+    | MapW(x, ek, ev) ->
         (match typecheck_expr f edl vdl (Var x),
                typecheck_expr f edl vdl ek,
                typecheck_expr f edl vdl ev with
-          | Ok(tx),Ok(tk),Ok(tv) -> (match tx with
-              | MapET(txk,_) when not (subtype tk txk) -> Error [TypeError (f,ek,tk,txk)]
-              | MapET(_,txv) when not (subtype tv txv) -> Error [TypeError (f,ev,tv,txv)]
-              | MapET(_,_) -> Ok()
-              | _ -> Error [NotMapError (f,Var x)])
+          | Ok(tx), Ok(tk), Ok(tv) -> (match tx with
+            | MapET(txk,_) when not (subtype tk txk) ->
+              Error [TypeError (f, ek, tk, txk)]
+            | MapET(_,txv) when not (subtype tv txv) ->
+              Error [TypeError (f, ev, tv, txv)]
+            | MapET(_,_) -> Ok()
+            | _ -> Error [NotMapError (f, Var x)])
           | res1,res2,res3 -> typeckeck_result_from_expr_result (res1 >>+ res2 >>+ res3))
+    | Seq(c1, c2) -> typecheck_cmd f edl vdl c1 >> typecheck_cmd f edl vdl c2
 
-    | Seq(c1,c2) ->
-        typecheck_cmd f edl vdl c1
-        >>
-        typecheck_cmd f edl vdl c2
-
-    | If(e,c1,c2) -> (match typecheck_expr f edl vdl e with
+    | If(e, c1, c2) -> (match typecheck_expr f edl vdl e with
           | Ok(BoolConstET true)  -> typecheck_cmd f edl vdl c1
           | Ok(BoolConstET false) -> typecheck_cmd f edl vdl c2
-          | Ok(BoolET) ->
-              typecheck_cmd f edl vdl c1
-              >>
-              typecheck_cmd f edl vdl c2
+          | Ok(BoolET) -> typecheck_cmd f edl vdl c1
+            >> typecheck_cmd f edl vdl c2
           | Ok(te) -> Error [TypeError (f,e,te,BoolET)]
           | res -> typeckeck_result_from_expr_result res)
 
     | Send(ercv,eamt) -> (match typecheck_expr f edl vdl ercv with
           | Ok(AddrET(true)) -> Ok() (* can only send to payable addresses *)
-          | Ok(t_ercv) -> Error [TypeError(f,ercv,t_ercv,AddrET(true))]
+          | Ok(t_ercv) -> Error [TypeError(f, ercv, t_ercv, AddrET(true))]
           | res -> typeckeck_result_from_expr_result res)
-          >>
-          (match typecheck_expr f edl vdl eamt with
+          >> (match typecheck_expr f edl vdl eamt with
           | Ok(t_eamt) when subtype t_eamt UintET -> Ok()
-          | Ok(t_eamt) -> Error [TypeError(f,eamt,t_eamt,UintET)]
+          | Ok(t_eamt) -> Error [TypeError(f, eamt, t_eamt, UintET)]
           | res -> typeckeck_result_from_expr_result res)
 
     | Req(e) -> (match typecheck_expr f edl vdl e with
           | Ok(BoolET) -> Ok()
-          | Ok(te) -> Error [TypeError (f,e,te,BoolET)]
+          | Ok(te) -> Error [TypeError (f, e, te, BoolET)]
           | res -> typeckeck_result_from_expr_result res)
 
     | Block(lvdl,c) ->
         typecheck_local_decls f lvdl
-        >>
-        let vdl' = push_local_decls vdl lvdl in
+        >> let vdl' = push_local_decls vdl lvdl in
         typecheck_cmd f edl vdl' c
 
     | ExecBlock(_) -> assert(false) (* should not happen at static time *)
@@ -461,22 +507,40 @@ let rec typecheck_cmd (f : ide) (edl : enum_decl list) (vdl : all_var_decls) = f
 
     | ExecProcCall(_) -> assert(false) (* should not happen at static time *)
 
-    | Return(_) -> failwith "TODO: Return"
+    | Return(_) -> failwith "TODO: Return" (*~ Implement me! *)
 
 
+(*~ Helpers for receive checks. Need more work *)
+let ensure_empty_args fname = function
+    [] -> Ok ()
+  | _ -> Error [NonEmptyArgs (fname)]
+
+let ensure_empty_ret fname = function
+    [] -> Ok ()
+  | _ -> Error [NonEmptyReturn (fname)]
+
+let ensure_ext_pay fname vis mut = match vis, mut with
+    v,m when v = External && m = Payable -> Ok ()
+  | _ -> Error [NotExternPay (fname, vis, mut)]
+
+(*~ Typecheck for constructor, function and receive
+ * It takes a list of enum declarations, a list of variables and checks
+ * for duplicate
+ *)
 let typecheck_fun (edl : enum_decl list) (vdl : var_decl list) = function
   | Constr (al,c,_) ->
-      no_dup_local_var_decls "constructor" al
-      >>
-      typecheck_local_decls "constructor" al
-      >>
-      typecheck_cmd "constructor" edl (merge_var_decls vdl al) c
+    no_dup_local_var_decls "constructor" al
+    >> typecheck_local_decls "constructor" al
+    >> typecheck_cmd "constructor" edl (merge_var_decls vdl al) c
+  | Proc ("receive", al, c, vis, mut, ret) -> let f = "receive" in (*~ WIP *)
+    ensure_empty_args f al
+    >> ensure_ext_pay f vis mut
+    >> typecheck_cmd f edl (merge_var_decls vdl al) c
+    >> ensure_empty_ret f ret
   | Proc (f,al,c,_,__,_) ->
-      no_dup_local_var_decls f al
-      >>
-      typecheck_local_decls f al
-      >>
-      typecheck_cmd f edl (merge_var_decls vdl al) c
+    no_dup_local_var_decls f al
+    >> typecheck_local_decls f al
+    >> typecheck_cmd f edl (merge_var_decls vdl al) c
 
 (* dup_first: finds the first duplicate in a list *)
 let rec dup_first (l : 'a list) : 'a option = match l with
@@ -503,14 +567,11 @@ let typecheck_enums (edl : enum_decl list) =
 let typecheck_contract (Contract(_,edl,vdl,fdl)) : typecheck_result =
   (* no multiply declared enums *)
   typecheck_enums edl
-  >>
   (* no multiply declared state variables *)
-  no_dup_var_decls vdl
-  >>
+  >> no_dup_var_decls vdl
   (* no multiply declared functions *)
-  no_dup_fun_decls fdl
-  >>
-  List.fold_left (fun acc fd -> acc >> typecheck_fun edl vdl fd) (Ok ()) fdl
+  >> no_dup_fun_decls fdl
+  >> List.fold_left (fun acc fd -> acc >> typecheck_fun edl vdl fd) (Ok ()) fdl
 
 
 let string_of_typecheck_result = function

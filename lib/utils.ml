@@ -108,16 +108,16 @@ let find_index f l =
 
 (*~
  * Would be more elegant to write the predicate as "found?" like in Scheme,
- * but OCaml won't allow it for whatever reason.
- * Nevermind, I'll use Common LISP convention instead..
+ * but OCaml doesn't allow it.
+ * Nevermind, I'll use a convention borrowed from Common LISP instead..
  *)
 let find_index comparator list =
   let rec find_index_helper(foundp, idx) compare = function
       [] -> (foundp, idx)
-    | car::cdr -> (*~ Analyze the items in the list *)
+    | first::rest -> (*~ Analyze the items in the list *)
       if foundp then (foundp, idx)
-      else if compare car then (true, idx)
-      else find_index_helper (foundp, idx + 1) compare cdr
+      else if compare first then (true, idx)
+      else find_index_helper (foundp, idx + 1) compare rest
   in let (foundp, idx) = find_index_helper (false, 0) comparator list in
   if foundp then Some idx else None
 
@@ -468,8 +468,10 @@ let rec resolve_unknown_cmd enums = function
   | Block(vdl,c)  -> Block(resolve_unknown_local_decls enums vdl, resolve_unknown_cmd enums c)
 
 let resolve_unknown_fun enums = function
-  | Constr (al,c,p) -> Constr (resolve_unknown_local_decls enums al,resolve_unknown_cmd enums c,p)
-  | Proc (f,al,c,v,m,ret) -> Proc(f,resolve_unknown_local_decls enums al,resolve_unknown_cmd enums c,v,m,ret)
+  | Constr (al,c,p) ->
+    Constr (resolve_unknown_local_decls enums al,resolve_unknown_cmd enums c,p)
+  | Proc (f,al,c,v,m,ret) ->
+    Proc(f,resolve_unknown_local_decls enums al,resolve_unknown_cmd enums c,v,m,ret)
 
 let resolve_unknown_contract (Contract(c,enums,vdl,fdl)) =
   Contract(c,enums,resolve_unknown_decls enums vdl, List.map (fun fd -> resolve_unknown_fun enums fd) fdl)

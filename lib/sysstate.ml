@@ -176,6 +176,10 @@ let update_map (st : sysstate) (x:ide) (k:exprval) (v:exprval) : sysstate =
 (*              Retrieving contracts and functions from state                 *)
 (******************************************************************************)
 
+(*~ Taken a name of function (an identifier) and a contract, returns a
+ * a function declaration if it exists, None otherwise.
+ * For a case like constructor, it must have type a specific name.
+ *)
 let find_fun_in_contract (Contract(_,_,_,fdl)) (f : ide) : fun_decl option =
   List.fold_left
   (fun acc fd -> match fd with
@@ -192,10 +196,12 @@ let find_fun_in_sysstate (st : sysstate) (a : addr) (f : ide) =
     | None -> None  (* "address " ^ a ^ " is not a contract address" *)
     | Some(c) -> find_fun_in_contract c f
 
+(*~ Get the command list (the body) from a function declaration *)
 let get_cmd_from_fun = function
   | (Constr(_,c,_)) -> c
   | (Proc(_,_,c,_,_,_)) -> c
 
+(*~ Get the argument list and local variables (?) of the function *)
 let get_var_decls_from_fun = function
   | (Constr(vdl,_,_)) -> vdl
   | (Proc(_,vdl,_,_,_,_)) -> vdl
