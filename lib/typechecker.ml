@@ -509,7 +509,7 @@ let rec typecheck_expr (f : ide) (edl : enum_decl list) vdl = function
 
 let is_immutable (x : ide) (vdl : var_decl list) =
   List.fold_left (fun acc (vd : var_decl) ->
-      acc || (vd.name = x && vd.mutability <> Mutable)) false vdl
+      acc || (vd.name = x && vd.mutability = Immutable)) false vdl
 
 let is_constant (x : ide) (vdl : var_decl list) =
   List.exists (fun (vd : var_decl) ->
@@ -537,12 +537,12 @@ let rec typecheck_cmd (f: ide) (edl: enum_decl list) (vdl: all_var_decls) (fdl: 
       (* constants can never be assigned *)
         if is_constant x (get_state_var_decls vdl) then
           Error [ConstantAssignment (f,x)]
-      
+
         (* immutables can only be assigned in the constructor *)
         else if f <> "constructor"
              && is_immutable x (get_state_var_decls vdl) then
           Error [ImmutabilityError (f,x)]
-      
+
         else (
           match typecheck_expr f edl vdl e,
                 typecheck_expr f edl vdl (Var x) with
@@ -683,7 +683,7 @@ let ensure_empty_ret fname = function
 let ensure_ext_pay fname vis mut = match vis, mut with
     v,m when v = External && m = Payable -> Ok ()
   | _ -> Error [NotExternPay (fname, vis, mut)]
-  
+
 
 let check_constant_initialized (vdl : var_decl list) : typecheck_result =
   List.fold_left (fun acc (vd : var_decl) ->
