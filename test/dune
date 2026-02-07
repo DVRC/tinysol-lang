@@ -1,6 +1,6 @@
 (library
  (name test)
- (modules parser semantics typechecker shortcircuit externpay)
+ (modules parser semantics typechecker shortcircuit externpay multiple_returns)
  (inline_tests)
  (preprocess (pps ppx_inline_test))
  (libraries tinysolLib))

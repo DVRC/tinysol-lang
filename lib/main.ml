@@ -327,7 +327,24 @@ and step_cmd = function
       | Assign(x,e) ->
         let (e', st') = step_expr (e, st) in CmdSt(Assign(x,e'), st')
 
-      | Decons(_) -> failwith "TODO: multiple return values"
+      (* Destructuring assignment: (a, b, c) = this.f() *)
+      | Decons(var_list, ExecFunCall(c)) ->
+        (match step_cmd (CmdSt(c,st)) with
+         | Returned vl ->
+           let st' = List.fold_left2 (fun acc_st var_opt value ->
+             match var_opt with
+             | None -> acc_st
+             | Some var_name -> update_var acc_st var_name value
+           ) (pop_callstack st) var_list vl in
+           St st'
+         | Reverted s -> Reverted s
+         | St _ -> failwith "function terminated without return"
+         | CmdSt(c', st') -> CmdSt(Decons(var_list, ExecFunCall(c')), st')
+        )
+
+      | Decons(var_list, e) ->
+        let (e', st') = step_expr (e, st) in
+        CmdSt(Decons(var_list, e'), st')
 
       | MapW(x,ek,ev) when is_val ek && is_val ev ->
         St (update_map st x (exprval_of_expr ek) (exprval_of_expr ev))
@@ -380,10 +397,11 @@ and step_cmd = function
       | Req(e) ->
         let (e', st') = step_expr (e, st) in CmdSt(Req(e'), st')
 
+      (* Return with multiple values *)
       | Return(el) when List.for_all is_val el -> Returned (List.map exprval_of_expr el)
-      | Return(el) -> (match el with
-          | [e] -> let (e', st') = step_expr (e, st) in CmdSt(Return([e']), st')
-          | _ -> failwith "TODO: multiple return values not supported")
+      | Return(el) ->
+          let (el', st') = step_expr_list (el, st) in
+          CmdSt(Return(el'), st')
 
       | Block(vdl,c) ->
         let r' = List.fold_left (fun acc vd ->
