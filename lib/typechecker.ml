@@ -83,6 +83,9 @@ exception NonEmptyArgs of ide
 exception NonEmptyReturn of ide
 exception NotExternPay of ide * visibility_t * fun_mutability_t
 
+exception UninitializedConstant of ide
+exception ConstantAssignment of ide * ide
+
 (* Multiple return values support (Issue #12) *)
 exception DeconsArityMismatch of ide * int * int
 exception DeconsTypeMismatch of ide * ide * exprtype * base_type
@@ -130,6 +133,8 @@ let string_of_typecheck_error = function
   | NotExternPay (f, _, _) -> logfun f "must be declared as \"external payable\" "
   | NonEmptyArgs (f) -> logfun f "mustn't have arguments"
   | NonEmptyReturn (f) -> logfun f "must not return anything"
+  | UninitializedConstant x -> "constant variable " ^ x ^ " must be initialized"
+  | ConstantAssignment (f,x) -> logfun f ("constant variable " ^ x ^ " cannot be assigned")
   | DeconsArityMismatch (f, expected, actual) ->
     logfun f "destructuring expects " ^ string_of_int expected ^
     " values but function returns " ^ string_of_int actual
@@ -506,6 +511,11 @@ let is_immutable (x : ide) (vdl : var_decl list) =
   List.fold_left (fun acc (vd : var_decl) ->
       acc || (vd.name = x && vd.mutability <> Mutable)) false vdl
 
+let is_constant (x : ide) (vdl : var_decl list) =
+  List.exists (fun (vd : var_decl) ->
+    vd.name = x && vd.mutability = Constant
+  ) vdl
+
 (*~ f is an identifier of the procedure,
  * vdl here is the arguments list (?)
  * In any case, it checks that for each var declaration there aren't
@@ -524,15 +534,24 @@ let rec typecheck_cmd (f: ide) (edl: enum_decl list) (vdl: all_var_decls) (fdl: 
     | Skip -> Ok ()
 
     | Assign(x,e) ->
-      (* the immutable modifier is not checked for the constructor *)
-      if f <> "constructor" && is_immutable x (get_state_var_decls vdl) then
-        Error [ImmutabilityError (f,x)]
-      else (
-        match typecheck_expr f edl vdl e, typecheck_expr f edl vdl (Var x) with
-        | Ok(te), Ok(tx) -> if subtype te tx
-          then Ok() else Error [TypeError (f,e,te,tx)]
-        | res1, res2 -> typeckeck_result_from_expr_result (res1 >>+ res2)
-      )
+      (* constants can never be assigned *)
+        if is_constant x (get_state_var_decls vdl) then
+          Error [ConstantAssignment (f,x)]
+      
+        (* immutables can only be assigned in the constructor *)
+        else if f <> "constructor"
+             && is_immutable x (get_state_var_decls vdl) then
+          Error [ImmutabilityError (f,x)]
+      
+        else (
+          match typecheck_expr f edl vdl e,
+                typecheck_expr f edl vdl (Var x) with
+          | Ok(te), Ok(tx) ->
+              if subtype te tx then Ok()
+              else Error [TypeError (f,e,te,tx)]
+          | res1, res2 ->
+              typeckeck_result_from_expr_result (res1 >>+ res2)
+        )
 
     | Decons(var_list, expr) ->
       (* Validate destructuring: (a, b, c) = this.f() *)
@@ -664,6 +683,17 @@ let ensure_empty_ret fname = function
 let ensure_ext_pay fname vis mut = match vis, mut with
     v,m when v = External && m = Payable -> Ok ()
   | _ -> Error [NotExternPay (fname, vis, mut)]
+  
+
+let check_constant_initialized (vdl : var_decl list) : typecheck_result =
+  List.fold_left (fun acc (vd : var_decl) ->
+    match vd.mutability, vd.init_value with
+    | Constant, None ->
+        acc >> Error [UninitializedConstant vd.name]
+    | _ -> acc
+  ) (Ok ()) vdl
+
+
 
 (*~ Typecheck for constructor, function and receive
  * It takes a list of enum declarations, a list of variables and checks
@@ -713,6 +743,8 @@ let typecheck_contract (Contract(_,edl,vdl,fdl)) : typecheck_result =
   >> no_dup_var_decls vdl
   (* no multiply declared functions *)
   >> no_dup_fun_decls fdl
+  (* no uninitialized constants *)
+  >> check_constant_initialized vdl
   >> List.fold_left (fun acc fd -> acc >> typecheck_fun edl vdl fdl fd) (Ok ()) fdl
 
 
