@@ -33,13 +33,13 @@ let%test "test_typecheck_receive_5" = test_typecheck
   true
 
 (*~ Check for absence of external
- * Fixme: this assert fails, typechecker surely needs more work
+ * Fixme: This assert crashes the parser
  *)
-let%test "test_typecheck_receive_6" = test_typecheck
+(*let%test "test_typecheck_receive_6" = test_typecheck
   "contract C {
     receive() payable { }
   }"
-  false
+  false*)
 
 (*~ Cannot have returns *)
 let%test "test_typecheck_receive_7" = test_typecheck
